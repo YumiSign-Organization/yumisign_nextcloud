@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>yumisign_nextcloud</id>
+    <name>YumiSign for Nextcloud</name>
+    <summary>Nextcloud app to sign your documents with YumiSign</summary>
+    <description><![CDATA[# Electronic Signature
+Click & Sign with your mobile thanks to the YumiSign Server which validates
+your digital identity.
+YumiSign eSignature is recognized by all jurisdictions and complies with European regulations.
+
+
+# Features
+* Strong Authentication MFA
+* Simple, Advanced Signatures
+* Qualified Electronic Signature with our YumiSign Card Reader for IOS & Android
+]]></description>
+    <screenshot>
+        img/screenshots/screenshot-menu.png
+    </screenshot>
+    <screenshot>
+        img/screenshots/screenshot-modal.png
+    </screenshot>
+    <screenshot>
+        img/screenshots/screenshot-modal-sign-types.png
+    </screenshot>
+    <screenshot>
+        img/screenshots/screenshot-notifications.png
+    </screenshot>
+    <version>0.0.2</version>
+    <licence>agpl</licence>
+    <author mail="info@rcdevs.com">RCDevs</author>
+    <namespace>YumiSignNxtC</namespace>
+    <category>files</category>
+    <category>office</category>
+    <category>tools</category>
+    <category>security</category>
+    <bugs>https://github.com/rcdevs/yumisign_nextcloud/issues</bugs>
+    <dependencies>
+        <php min-version="7.3" />
+        <nextcloud min-version="24" max-version="25" />
+    </dependencies>
+    <navigations>
+        <navigation>
+            <name>YumiSign</name>
+            <route>yumisign_nextcloud.sign.index</route>
+        </navigation>
+    </navigations>
+    <settings>
+        <admin>OCA\YumiSignNxtC\Settings\AdminSettings</admin>
+        <admin-section>OCA\YumiSignNxtC\Settings\AdminSection</admin-section>
+    </settings>
+    <background-jobs>
+        <job>OCA\YumiSignNxtC\Cron\CheckAsyncSignatureTask</job>
+    </background-jobs>
+</info>

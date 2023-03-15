@@ -1,0 +1,15 @@
+{
+    "name": "rcdevs/yumisign_nextcloud",
+    "description": "Nextcloud app to sign your documents with YumiSign",
+    "type": "project",
+    "license": "AGPL",
+    "authors": [
+        {
+            "name": "RCDevs"
+        }
+    ],
+    "require": {
+        "setasign/fpdi-fpdf": "^2.3",
+        "econea/nusoap": "^0.9.11"
+    }
+}
