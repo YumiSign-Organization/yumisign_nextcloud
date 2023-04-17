@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -27,25 +27,15 @@ use Exception;
 use OC\Config;
 use OCA\Activity\AppInfo\Application;
 use OCP\IConfig;
+use OC\Server;
+use OC\SystemConfig;
 
 class LogYumiSign
 {
-	private static $nxcDataDirectory;
-
-	private static function __constructStatic()
-	{
-		// $__config = new \OC\Config('config/');
-		// self::$nxcDataDirectory = rtrim($__config->getValue('datadirectory'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-		// $__config = new IConfig();
-
-		// self::$nxcDataDirectory = $__config->getSystemValue('datadirectory');
-	}
-
 	public static function write($logMsg, $functionName, $throw = false)
 	{
-		// if (empty(self::$nxcDataDirectory)) self::__constructStatic();
-
-		// error_log(sprintf("[%s] [YumiSign-Nextcloud] [%s] %s\n", date("Y-m-d H:i:s"), $functionName, $logMsg), 3, self::$nxcDataDirectory . "YumiSignNxtC.log");
+		$dataFolder = rtrim(\OC::$server->get(SystemConfig::class)->getValue('datadirectory', false), DIRECTORY_SEPARATOR);
+		error_log(sprintf("[%s] [YumiSign-Nextcloud] [%s] %s\n", date("Y-m-d H:i:s"), $functionName, $logMsg), 3, $dataFolder . DIRECTORY_SEPARATOR . "YumiSignNxtC.log");
 		if ($throw) throw new Exception($logMsg, 1);
 	}
 }

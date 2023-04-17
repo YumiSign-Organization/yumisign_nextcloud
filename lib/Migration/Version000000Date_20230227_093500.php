@@ -44,6 +44,6 @@ class Version000000Date_20230227_093500 extends SimpleMigrationStep
         $query = $this->db->getQueryBuilder();
         $query->update('yumisign_nxtc_sess')
             ->set('expiry_date_lower', 'expiry_Date');
-        $query->execute();
+        $query->executeQuery();
     }
 }

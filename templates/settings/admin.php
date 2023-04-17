@@ -1,7 +1,7 @@
 <?php
 /**
  *
- * @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -27,20 +27,23 @@ OCP\Util::addscript($appId, 'yumisign_nextcloud-adminSettings');
 ?>
 <div
   id="yumisign_nextcloud-admin-root"
-  data-server-urls="<?php echo htmlspecialchars($_['server_urls']) ?>"
-  data-api-key="<?php echo $_['api_key'] ?>"
-  data-default-domain="<?php echo $_['default_domain'] ?>"
-  data-user-settings="<?php echo $_['user_settings'] ?>"
-  data-use-proxy="<?php echo $_['use_proxy'] ?>"
-  data-proxy-host="<?php echo $_['proxy_host'] ?>"
-  data-proxy-port="<?php echo $_['proxy_port'] ?>"
-  data-proxy-username="<?php echo $_['proxy_username'] ?>"
-  data-proxy-password="<?php echo $_['proxy_password'] ?>"
-  data-sign-scope="<?php echo $_['sign_scope'] ?>"
-  data-signed-file="<?php echo $_['signed_file'] ?>"
-  data-sync-timeout="<?php echo $_['sync_timeout'] ?>"
-  data-async-timeout="<?php echo $_['async_timeout'] ?>"
-  data-cron-interval="<?php echo $_['cron_interval'] ?>"
-  data-enable-demo-mode="<?php echo $_['enable_demo_mode'] ?>"
-  data-watermark-text="<?php echo $_['watermark_text'] ?>"
+  data-server-url       ="<?php echo htmlspecialchars($_['server_url']) ?>"
+  data-api-key          ="<?php echo $_['api_key'] ?>"
+  data-workspace-id     ="<?php echo $_['workspace_id'] ?>"
+  data-workspace-name   ="<?php echo $_['workspace_name'] ?>"
+  data-description      ="<?php echo $_['description'] ?>"
+  data-default-domain   ="<?php echo $_['default_domain'] ?>"
+  data-user-settings    ="<?php echo $_['user_settings'] ?>"
+  data-use-proxy        ="<?php echo $_['use_proxy'] ?>"
+  data-proxy-host       ="<?php echo $_['proxy_host'] ?>"
+  data-proxy-port       ="<?php echo $_['proxy_port'] ?>"
+  data-proxy-username   ="<?php echo $_['proxy_username'] ?>"
+  data-proxy-password   ="<?php echo $_['proxy_password'] ?>"
+  data-sign-scope       ="<?php echo $_['sign_scope'] ?>"
+  data-signed-file      ="<?php echo $_['signed_file'] ?>"
+  data-sync-timeout     ="<?php echo $_['sync_timeout'] ?>"
+  data-async-timeout    ="<?php echo $_['async_timeout'] ?>"
+  data-cron-interval    ="<?php echo $_['cron_interval'] ?>"
+  data-enable-demo-mode ="<?php echo $_['enable_demo_mode'] ?>"
+  data-watermark-text   ="<?php echo $_['watermark_text'] ?>"
 ></div>

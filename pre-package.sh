@@ -1,5 +1,7 @@
 #!/bin/bash
 make
+
+
 # rm -f babel.config.js
 # rm -rf build/
 # rm -f composer.json
@@ -8,7 +10,6 @@ make
 # rm -rf .git/
 # rm -f .gitignore
 # rm -f Makefile
-# #rm -rf node_modules/
 # find ./node_modules -mindepth 1 ! -regex '^./node_modules/vuejs-paginate\(/.*\)?' -delete
 # rm -f package.json
 # rm -f package-lock.json
@@ -21,4 +22,7 @@ make
 # rm -rf translationfiles/
 # rm -f .travis.yml
 # rm -f webpack.js
+# rm -rf node_modules/
+# rm -f translationtool.phar
+# rm -f fullMake.sh
 # rm -f pre-package.sh

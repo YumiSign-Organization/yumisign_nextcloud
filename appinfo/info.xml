@@ -27,7 +27,7 @@ YumiSign eSignature is recognized by all jurisdictions and complies with Europea
     <screenshot>
         img/screenshots/screenshot-notifications.png
     </screenshot>
-    <version>0.0.2</version>
+    <version>1.0.0</version>
     <licence>agpl</licence>
     <author mail="info@rcdevs.com">RCDevs</author>
     <namespace>YumiSignNxtC</namespace>
@@ -37,8 +37,8 @@ YumiSign eSignature is recognized by all jurisdictions and complies with Europea
     <category>security</category>
     <bugs>https://github.com/rcdevs/yumisign_nextcloud/issues</bugs>
     <dependencies>
-        <php min-version="7.3" />
-        <nextcloud min-version="24" max-version="25" />
+        <php min-version="8.1" />
+        <nextcloud min-version="24" max-version="26" />
     </dependencies>
     <navigations>
         <navigation>

@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -198,76 +198,6 @@ class SignController extends Controller
 			'code' => strval($resp['code']),
 			'message' => $resp['message']
 		]);
-	}
-
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 * @PublicPage
-	 * @CORS
-	 */
-	public function testing()
-	{
-		return $this->signService->checkAsyncSignature();
-
-		
-		// t=1676476613,v1=358baac8de1cc5fd12c532c68638eb5a0396f03df47c3230d6cc8dcccc82576f
-		$url = "https://sandbox.bayssette.fr/nextcloud-25.0.3/index.php/apps/yumisign_nextcloud/webhook";
-		$request = "POST";
-		$dataJson =
-			substr(
-				trim('
-		Webhook (2023-02-27 18.34.34) : {"_route":"yumisign_nextcloud.sign.webhook","id":"20230227892cecb3400d349f66bad2c4fb099bf4","workspaceId":14933,"status":"canceled","startDate":1677522849,"scheduledStartDate":null,"createDate":1677522817,"expiryDate":1677628799,"documents":[{"id":10068,"file":{"file":"https:\/\/app.yumisign.com:443\/api\/v1\/storage\/temp\/9946\/doc\/63fcf78155793b430a7226f2d40fbe80","thumb":"https:\/\/app.yumisign.com:443\/api\/v1\/storage\/temp\/9946\/doc\/63fcf7819512e4a6604d096c2255fc4f","format":"pdf","size":976625,"name":"Reasons to use Nextcloud.pdf"},"position":1}],"steps":[{"order":1,"type":"sign","expiryDate":null,"actions":[{"status":"started","recipientId":12071,"transaction":null,"recipientEmail":"eric.james@bayssette.fr","role":12191,"type":"sign","comment":null,"stepNumber":1,"id":12276},{"status":"started","recipientId":12073,"transaction":null,"recipientEmail":"hello@ejb-info.fr","role":12193,"type":"sign","comment":null,"stepNumber":1,"id":12278}],"status":"started","id":10488}],"recipients":[{"picture":{"file":null,"thumb":null,"format":" ","size":0},"roles":[{"type":"sign","color":"#fd94f5","id":12191}],"email":"eric.james@bayssette.fr","id":12071,"name":"eric.james@bayssette.fr"},{"picture":{"file":null,"thumb":null,"format":" ","size":0},"roles":[{"type":"sign","color":"#8eb09e","id":12193}],"email":"hello@ejb-info.fr","id":12073,"name":"hello@ejb-info.fr"}],"type":"simple","metadata":[],"name":"2023-02-27_18:33:35_63fcf77fee6da8.91635760"}
-		'),
-		// Webhook (2023-02-27 18.34.34) : {"_route":"yumisign_nextcloud.sign.webhook","id":"20230227892cecb3400d349f66bad2c4fb099bf4","workspaceId":14933,"status":"canceled","startDate":1677522849,"scheduledStartDate":null,"createDate":1677522817,"expiryDate":1677628799,"documents":[{"id":10068,"file":{"file":"https:\/\/app.yumisign.com:443\/api\/v1\/storage\/temp\/9946\/doc\/63fcf78155793b430a7226f2d40fbe80","thumb":"https:\/\/app.yumisign.com:443\/api\/v1\/storage\/temp\/9946\/doc\/63fcf7819512e4a6604d096c2255fc4f","format":"pdf","size":976625,"name":"Reasons to use Nextcloud.pdf"},"position":1}],"steps":[{"order":1,"type":"sign","expiryDate":null,"actions":[{"status":"started","recipientId":12071,"transaction":null,"recipientEmail":"eric.james@bayssette.fr","role":12191,"type":"sign","comment":null,"stepNumber":1,"id":12276},{"status":"started","recipientId":12073,"transaction":null,"recipientEmail":"hello@ejb-info.fr","role":12193,"type":"sign","comment":null,"stepNumber":1,"id":12278}],"status":"started","id":10488}],"recipients":[{"picture":{"file":null,"thumb":null,"format":" ","size":0},"roles":[{"type":"sign","color":"#fd94f5","id":12191}],"email":"eric.james@bayssette.fr","id":12071,"name":"eric.james@bayssette.fr"},{"picture":{"file":null,"thumb":null,"format":" ","size":0},"roles":[{"type":"sign","color":"#8eb09e","id":12193}],"email":"hello@ejb-info.fr","id":12073,"name":"hello@ejb-info.fr"}],"type":"simple","metadata":[],"name":"2023-02-27_18:33:35_63fcf77fee6da8.91635760"}
-				32
-			);
-		// 	str_replace(
-		// 		'Webhook : ',
-		// 		'',
-		// 		'
-		// 		Webhook (2023-02-27 18.34.34) : {"_route":"yumisign_nextcloud.sign.webhook","id":"20230227892cecb3400d349f66bad2c4fb099bf4","workspaceId":14933,"status":"canceled","startDate":1677522849,"scheduledStartDate":null,"createDate":1677522817,"expiryDate":1677628799,"documents":[{"id":10068,"file":{"file":"https:\/\/app.yumisign.com:443\/api\/v1\/storage\/temp\/9946\/doc\/63fcf78155793b430a7226f2d40fbe80","thumb":"https:\/\/app.yumisign.com:443\/api\/v1\/storage\/temp\/9946\/doc\/63fcf7819512e4a6604d096c2255fc4f","format":"pdf","size":976625,"name":"Reasons to use Nextcloud.pdf"},"position":1}],"steps":[{"order":1,"type":"sign","expiryDate":null,"actions":[{"status":"started","recipientId":12071,"transaction":null,"recipientEmail":"eric.james@bayssette.fr","role":12191,"type":"sign","comment":null,"stepNumber":1,"id":12276},{"status":"started","recipientId":12073,"transaction":null,"recipientEmail":"hello@ejb-info.fr","role":12193,"type":"sign","comment":null,"stepNumber":1,"id":12278}],"status":"started","id":10488}],"recipients":[{"picture":{"file":null,"thumb":null,"format":" ","size":0},"roles":[{"type":"sign","color":"#fd94f5","id":12191}],"email":"eric.james@bayssette.fr","id":12071,"name":"eric.james@bayssette.fr"},{"picture":{"file":null,"thumb":null,"format":" ","size":0},"roles":[{"type":"sign","color":"#8eb09e","id":12193}],"email":"hello@ejb-info.fr","id":12073,"name":"hello@ejb-info.fr"}],"type":"simple","metadata":[],"name":"2023-02-27_18:33:35_63fcf77fee6da8.91635760"}
-		// 		'
-		// 	)
-		// );
-		$secret = "bea5bb30c185d85c2b0e5cbcfb6ff219";
-
-		$dataJson = json_decode($dataJson, true);
-		if (array_key_exists('_route', $dataJson)) unset($dataJson['_route']);
-		$dataJson = json_encode($dataJson);
-
-		$payload = ".{$dataJson}";
-
-		try {
-			$ch = curl_init();
-
-			curl_setopt($ch, CURLOPT_URL, $url);
-			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $request);
-			curl_setopt($ch, CURLOPT_HEADER, true);
-
-			curl_setopt($ch, CURLOPT_HTTPHEADER, [
-				'YUMISIGN-SIGNATURE:t=,v1=' . hash_hmac('sha256', $payload, $secret),
-				'Content-Type:application/json',
-			]);
-
-			curl_setopt($ch, CURLOPT_POSTFIELDS, $dataJson);
-
-			$curlResponse = new CurlResponse();
-
-			$curlResponse->response = curl_exec($ch);
-			$curlResponse->code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-			$curlResponse->header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-			$curlResponse->header = substr($curlResponse->response, 0, $curlResponse->header_size);
-			$curlResponse->body   = substr($curlResponse->response,    $curlResponse->header_size);
-
-			return $curlResponse->body;
-
-			curl_close($ch);
-		} catch (\Throwable $th) {
-			return $th->getMessage();
-		}
 	}
 
 	/**

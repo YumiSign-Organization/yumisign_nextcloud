@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -39,10 +39,15 @@ use OCA\YumiSignNxtC\Notification\Notifier;
 
 require_once(__DIR__ . '/../../vendor/autoload.php');
 
-define("YMS_DELETED",                    "deleted");
+define("YMS_ALREADY_CANCELLED",         "already_cancelled");
+define("YMS_CODE",                      "code");
+define("YMS_DELETED",                   "deleted");
 define("YMS_ERROR",                     "error");
 define("YMS_EXCEPTION",                 "Exception");
+define("YMS_ID",                        "id");
 define("YMS_IDENTIFIER",                "identifier");
+define("YMS_LIST_ID",                   "listId");
+define("YMS_MESSAGE",                   "message");
 define("YMS_NAME",                      "name");
 define("YMS_OWNER",                     "owner");
 define("YMS_RESPONSE",                  "response");
@@ -59,7 +64,8 @@ define("YMS_STATUS_SIGNED",             "signed");
 define("YMS_STATUS_STARTED",            "started");
 define("YMS_STATUS_TO_BE_ARCHIVED",     "to_be_archived");
 define("YMS_STATUS",                    "status");
-define("YMS_URL_ARCHIVE",               "https://app.yumisign.com:443/api/v1/storage/archive/");
+define("YMS_SUCCESS",                   "success");
+define("YMS_URL_ARCHIVE",               "/storage/archive/");
 define("YMS_VALUE",                     "value");
 define("YMS_WF_SECRET",                 "WorkflowNotificationCallbackUrlSecretPreference");
 

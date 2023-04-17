@@ -1,7 +1,7 @@
 <template>
 	<!--
 	*
-	* @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+	* @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
 	*
 	* @license GNU AGPL version 3 or any later version
 	*
@@ -26,15 +26,23 @@
 				<img v-if="checkingSettings" :src="loadingImg">
 				<p v-else-if="!settingsOk"
 					id="error_settings"
-					class="alert alert-danger"
-					v-html="$t('yumisign_nextcloud', 'You have to enter the <strong>YumiSign server URL</strong> in the <strong>YumiSign for Nextcloud</strong> settings prior to sign any document.')" />
+					class="alert alert-danger">
+					<span>
+						{{ warningServer }}
+					</span>
+				</p>
 				<div v-else>
 					<img v-if="!success" :src="mobileSigningImg" style="max-height: 200px;">
-					<p v-else id="green-tick">
-						&#10003;
+					<!-- BEGIN -->
+					<p v-else>
+						<span v-if="signatureTypeSelected != 'simple'" id="green-tick">
+							&#10003;
+						</span>
 					</p>
-					<p
-						v-html="$t('yumisign_nextcloud', 'Digital signature of file <strong>{filename}</strong>', { filename: filename })" />
+					<!-- END -->
+					<p>
+						{{ filenameMessage }} <strong>{{ filename }}</strong>
+					</p>
 					<p v-if="error" class="error">
 						{{ errorMessage }}
 					</p>
@@ -61,6 +69,7 @@
 								track-by="uid"
 								:user-select="true"
 								style="width: 400px"
+								:placeholder="`${placeHolderUser}`"
 								@select="checkNextcloudRadio"
 								@search-change="localUserSearchChanged">
 								<template #singleLabel="{ option }">
@@ -78,18 +87,16 @@
 								value="external"
 								name="recipient_radio"
 								type="radio">
-								{{ $t('yumisign_nextcloud', 'Signature by a YumiSign user:') }}
+								{{ $t('yumisign_nextcloud', 'Signature by email:') }}
 							</CheckboxRadioSwitch>
 							<input v-model="externalUserEmail"
 								type="text"
-								placeholder="email_address@domain.tld"
+								:placeholder="`${placeHolderEmail}`"
 								@input="checkExternalRadio">
 						</div>
 						<div class="flex-container">
-							<label for="signatureTypeSelected">{{
-								$t('yumisign_nextcloud', 'Select type of signature')
-							}}:</label>
-							<select v-model="signatureTypeSelected" placeholder="Select">
+							<label for="signatureTypeSelected">{{ $t('yumisign_nextcloud', 'Select type of signature:') }}</label>
+							<select v-model="signatureTypeSelected">
 								<option
 									v-for="item in optionsSigType"
 									:key="item.value"
@@ -98,13 +105,13 @@
 							</select>
 						</div>
 						<button type="button" @click="mobileSignature">
-							{{ $t('yumisign_nextcloud', 'Digital Signature') }}
+							{{ $t('yumisign_nextcloud', 'Digital signature') }}
 						</button>
 					</div>
 					<div v-if="requesting">
 						<img :src="loadingImg">
 					</div>
-					<div v-if="success">
+					<div v-if="success && signatureTypeSelected != 'simple'">
 						<button type="button" class="primary" @click="closeModal">
 							{{ $t('yumisign_nextcloud', 'Close') }}
 						</button>
@@ -148,9 +155,9 @@ export default {
 			formattedOptions: [],
 			designerUrl: '',
 			optionsSigType: [
-				{ label: 'Simple', value: 'simple' },
-				{ label: 'Advanced', value: 'advanced' },
-				{ label: 'Qualified', value: 'qualified' },
+				{ label: t('yumisign_nextcloud', 'Simple'), value: 'simple' },
+				// { label: t('yumisign_nextcloud', 'Advanced'), value: 'advanced' },
+				{ label: t('yumisign_nextcloud', 'Qualified'), value: 'qualified' },
 			],
 			signatureTypeSelected: 'simple', // Setting initial value
 		}
@@ -162,6 +169,10 @@ export default {
 		EventBus.$on('yumisign-sign-click', payload => {
 			this.showModal()
 			this.filename = payload.filename
+			this.filenameMessage = t('yumisign_nextcloud', 'Digital signature of file')
+			this.placeHolderUser = t('yumisign_nextcloud', 'Write a user Id')
+			this.placeHolderEmail = t('yumisign_nextcloud', 'Write one or several emails separated by semicolons')
+			this.warningServer = t('yumisign_nextcloud', 'You have to enter the YumiSign server URL in the YumiSign for Nextcloud settings prior to sign any document')
 		})
 	},
 	methods: {
@@ -239,11 +250,6 @@ export default {
 			this.modal = false
 		},
 		mobileSignature() {
-			if (!this.filename.toLowerCase().endsWith('.pdf')) {
-				alert(t('yumisign_nextcloud', 'Mobile signature is possible only with PDF files'))
-				return
-			}
-
 			if (this.recipientType === 'self') {
 				this.syncMobileSignature()
 			} else if (this.recipientType === 'nextcloud') {
@@ -253,95 +259,36 @@ export default {
 			}
 		},
 		syncMobileSignature() {
-			this.error = false
-			this.requesting = true
-			const baseUrl = generateUrl('/apps/yumisign_nextcloud')
-
-			const CancelToken = axios.CancelToken
-			this.source = CancelToken.source()
-			axios.post(baseUrl + '/mobile_sign', {
-				path: this.getFilePath(),
-				appUrl: location.protocol + '//' + location.host + generateUrl('/apps/yumisign_nextcloud'),
-				signatureType: this.signatureTypeSelected,
-			}, {
-				cancelToken: this.source.token,
-			})
-				.then(response => {
-					this.requesting = false
-					if (response.data.session !== null && response.data.session !== '') {
-						this.success = true
-						const yumisignCallback = encodeURIComponent(location.protocol + '//' + location.host + generateUrl('/apps/yumisign_nextcloud') + '/async_external_mobile_sign_submit?workspaceId=' + response.data.workspaceId + '&workflowId=' + response.data.workflowId + '&envelopeId=' + response.data.envelopeId + '&url=' + window.location.href)
-						this.designerUrl = response.data.designerUrl + '?callback=' + yumisignCallback
-						if (this.signatureTypeSelected.toLowerCase() === 'simple') {
-							window.location.replace(this.designerUrl)
-						}
-					} else {
-						this.error = true
-						this.errorMessage = 'Error: ' + response.data.message
-					}
-				})
-				.catch(error => {
-					this.requesting = false
-					this.error = true
-					this.errorMessage = error
-				})
+			this._commonCallSignature('/apps/yumisign_nextcloud', '/mobile_sign')
 		},
 		asyncLocalMobileSignature() {
 			if (this.recipientType === 'nextcloud' && !this.localUser) {
 				return
 			}
 
-			this.error = false
-			this.requesting = true
-			const baseUrl = generateUrl('/apps/yumisign_nextcloud')
-
-			const CancelToken = axios.CancelToken
-			this.source = CancelToken.source()
-			axios.post(baseUrl + '/async_local_mobile_sign', {
-				path: this.getFilePath(),
-				username: this.localUser.uid,
-				email: this.localUser.subtitle,
-				appUrl: location.protocol + '//' + location.host + generateUrl('/apps/yumisign_nextcloud'),
-				signatureType: this.signatureTypeSelected,
-			}, {
-				cancelToken: this.source.token,
-			})
-				.then(response => {
-					this.requesting = false
-					if (response.data.session !== null && response.data.session !== '') {
-						this.success = true
-						const yumisignCallback = encodeURIComponent(location.protocol + '//' + location.host + generateUrl('/apps/yumisign_nextcloud') + '/async_external_mobile_sign_submit?workspaceId=' + response.data.workspaceId + '&workflowId=' + response.data.workflowId + '&envelopeId=' + response.data.envelopeId + '&url=' + window.location.href)
-						this.designerUrl = response.data.designerUrl + '?callback=' + yumisignCallback
-						if (this.signatureTypeSelected.toLowerCase() === 'simple') {
-							window.location.replace(this.designerUrl)
-						}
-					} else {
-						this.error = true
-						this.errorMessage = 'Error: ' + response.data.message
-					}
-				})
-				.catch(error => {
-					this.requesting = false
-					this.error = true
-					this.errorMessage = error
-				})
+			this._commonCallSignature('/apps/yumisign_nextcloud', '/async_local_mobile_sign', this.localUser.subtitle, this.localUser.uid)
 		},
 		asyncExternalMobileSignature() {
 			if (this.recipientType === 'external' && (!this.externalUserEmail || !this.signatureTypeSelected)) {
 				return
 			}
 
+			this._commonCallSignature('/apps/yumisign_nextcloud', '/async_external_mobile_sign', this.externalUserEmail)
+		},
+
+		_commonCallSignature(url, axiosPostUrl, signerEmail = '', nxcUsername = '') {
 			this.error = false
 			this.requesting = true
-			const baseUrl = generateUrl('/apps/yumisign_nextcloud')
+			const baseUrl = generateUrl(url)
 
 			const CancelToken = axios.CancelToken
 			this.source = CancelToken.source()
-			axios.post(baseUrl + '/async_external_mobile_sign', {
+			axios.post(baseUrl + axiosPostUrl, {
 				path: this.getFilePath(),
-				email: this.externalUserEmail,
-				appUrl: location.protocol + '//' + location.host + generateUrl('/apps/yumisign_nextcloud'),
+				appUrl: location.protocol + '//' + location.host + generateUrl(url),
 				signatureType: this.signatureTypeSelected,
+				email: signerEmail,
+				username: nxcUsername,
 			}, {
 				cancelToken: this.source.token,
 			})
@@ -349,7 +296,7 @@ export default {
 					this.requesting = false
 					if (response.data.session !== null && response.data.session !== '') {
 						this.success = true
-						const yumisignCallback = encodeURIComponent(location.protocol + '//' + location.host + generateUrl('/apps/yumisign_nextcloud') + '/async_external_mobile_sign_submit?workspaceId=' + response.data.workspaceId + '&workflowId=' + response.data.workflowId + '&envelopeId=' + response.data.envelopeId + '&url=' + window.location.href)
+						const yumisignCallback = encodeURIComponent(location.protocol + '//' + location.host + generateUrl(url) + '/async_external_mobile_sign_submit?workspaceId=' + response.data.workspaceId + '&workflowId=' + response.data.workflowId + '&envelopeId=' + response.data.envelopeId + '&url=' + window.location.href)
 						this.designerUrl = response.data.designerUrl + '?callback=' + yumisignCallback
 						if (this.signatureTypeSelected.toLowerCase() === 'simple') {
 							window.location.replace(this.designerUrl)
@@ -365,6 +312,7 @@ export default {
 					this.errorMessage = error
 				})
 		},
+
 		getFilePath() {
 			const parsed = queryString.parse(window.location.search)
 			if (parsed.dir === '/') {
@@ -389,6 +337,7 @@ h1 {
 }
 
 #green-tick {
+	display: inline-block;
 	font-size: 150px;
 	color: green;
 	margin-top: 100px;

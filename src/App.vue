@@ -1,8 +1,4 @@
 <template>
-	<!--
-	SPDX-FileCopyrightText: RCDevs <netadm@rcdevs.com>
-	SPDX-License-Identifier: AGPL-3.0-or-later
-	-->
 	<div class="app-container">
 		<div id="app-navigation" role="navigation">
 			<ul>
@@ -11,11 +7,6 @@
 						{{ $t('yumisign_nextcloud', 'Pending signature requests') }}
 					</router-link>
 				</li>
-				<!-- <li>
-					<router-link to="/completed">
-						{{ $t('yumisign_nextcloud', 'Completed signature requests') }}
-					</router-link>
-				</li> -->
 				<li>
 					<router-link to="/issues">
 						{{ $t('yumisign_nextcloud', 'Signature requests issues') }}
@@ -39,101 +30,100 @@
 	</div>
 </template>
 
+<style>
+	@import '../css/listing.css';
+</style>
+
 <style scoped>
-.flex-container {
-	display: flex;
-}
+	.flex-container {
+		display: flex;
+	}
 
-.flex-child {
-	flex: 1;
-	border: 2px solid yellow;
-}
+	.flex-child {
+		flex: 1;
+		border: 2px solid yellow;
+	}
 
-.flex-child:first-child {
-	margin-right: 20px;
-}
+	.flex-child:first-child {
+		margin-right: 20px;
+	}
 
-.app-container {
-	margin-top: 0px;
-	display: flex;
-	width: 100%;
-}
+	.app-container {
+		margin-top: 0px;
+		display: flex;
+		width: 100%;
+	}
 
-#app-content >>> h1 {
-	font-size: 2em;
-	text-align: center;
-}
+	#app-content >>> h1 {
+		font-size: 2em;
+		text-align: center;
+	}
 
-#app-content >>> table {
-	border-collapse: collapse;
-	margin: 25px 0;
-	font-size: 0.9em;
-	font-family: sans-serif;
-	width: 100%;
-	box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
-}
+	/* #app-content >>> table {
+		border-collapse: collapse;
+		margin: 25px 0;
+		font-size: 0.9em;
+		font-family: sans-serif;
+		width: 100%;
+		box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+	}
 
-#app-content >>> thead tr {
-	background-color: var(--color-primary-element-light);
-	color: #ffffff;
-	text-align: left;
-}
+	#app-content >>> thead tr {
+		background-color: var(--color-primary-element-light);
+		color: #ffffff;
+		text-align: left;
+	}
 
-#app-content >>> th, #app-content >>> td {
-	padding: 12px 15px;
-}
+	#app-content >>> th, #app-content >>> td {
+		padding: 12px 15px;
+	}
 
-#app-content >>> tr {
-	border-bottom: 1px solid #dddddd;
-}
+	#app-content >>> tr {
+		border-bottom: 1px solid #dddddd;
+	}
 
-#app-content >>> tr:last-of-type {
-	border-bottom: 2px solid var(--color-primary-element-light);
-}
+	#app-content >>> tr:last-of-type {
+		border-bottom: 2px solid var(--color-primary-element-light);
+	} */
 
-#app-content >>> img {
-	display: block;
-	margin: 25px auto;
-}
+	#app-content >>> img {
+		display: block;
+		margin: 25px auto;
+	}
 
-#app-content >>> td img {
-	margin: 0 auto;
-}
+	#app-content >>> td img {
+		margin: 0 auto;
+	}
 
-#app-content >>> .component-container {
-	margin: 20px;
-	width: 100%;
-}
+	#app-content >>> .pagination {
+		list-style: none;
+		padding: 0;
+	}
 
-#app-content >>> .pagination {
-	list-style: none;
-	padding: 0;
-}
+	#app-content >>> .pagination li {
+		float: left;
+	}
 
-#app-content >>> .pagination li {
-	float: left;
-}
+	#app-content >>> .pagination a {
+		display: block;
+		border: solid #dddddd 1px;
+		padding: 6px 12px;
+		margin-right: -1px;
+		color: var(--color-primary-element-light);
+	}
 
-#app-content >>> .pagination a {
-	display: block;
-	border: solid #dddddd 1px;
-	padding: 6px 12px;
-	margin-right: -1px;
-	color: var(--color-primary-element-light);
-}
+	#app-content >>> .pagination .active a {
+		color: var(--color-main-background);
+		background-color: var(--color-primary-element-light);
+		cursor: default;
+	}
 
-#app-content >>> .pagination .active a {
-	color: var(--color-main-background);
-	background-color: var(--color-primary-element-light);
-	cursor: default;
-}
+	#app-content >>> .pagination .disabled a {
+		color: #dddddd;
+		cursor: not-allowed;
+	}
 
-#app-content >>> .pagination .disabled a {
-	color: #dddddd;
-	cursor: not-allowed;
-}
-
-#app-content >>> .pagination li:not(.active):not(.disabled) a:hover {
-	background-color: #dddddd;
-}
+	#app-content >>> .pagination li:not(.active):not(.disabled) a:hover {
+		background-color: #dddddd;
+	}
 </style>

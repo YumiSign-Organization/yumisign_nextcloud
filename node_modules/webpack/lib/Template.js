@@ -217,7 +217,7 @@ class Template {
 		if (Array.isArray(s)) {
 			return s.map(Template.indent).join("\n");
 		} else {
-			const str = s.trimRight();
+			const str = s.trimEnd();
 			if (!str) return "";
 			const ind = str[0] === "\n" ? "" : "\t";
 			return ind + str.replace(/\n([^\n])/g, "\n\t$1");
@@ -370,7 +370,8 @@ class Template {
 					dependencyTemplates: renderContext.dependencyTemplates,
 					moduleGraph: renderContext.moduleGraph,
 					runtimeTemplate: renderContext.runtimeTemplate,
-					runtime: renderContext.chunk.runtime
+					runtime: renderContext.chunk.runtime,
+					codeGenerationResults
 				});
 				if (!codeGenResult) continue;
 				runtimeSource = codeGenResult.sources.get("runtime");

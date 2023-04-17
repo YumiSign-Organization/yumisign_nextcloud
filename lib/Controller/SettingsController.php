@@ -1,7 +1,8 @@
 <?php
+
 /**
  *
- * @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -28,72 +29,97 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 
 use OCA\YumiSignNxtC\Service\SignService;
+use OCA\YumiSignNxtC\Utility\LogYumiSign;
 
-class SettingsController extends Controller {
+class SettingsController extends Controller
+{
 
 	private $config;
 	private $signService;
 
-	public function __construct($AppName, IRequest $request, IConfig $config, SignService $signService){
+	public function __construct($AppName, IRequest $request, IConfig $config, SignService $signService)
+	{
 		parent::__construct($AppName, $request);
 		$this->config = $config;
 		$this->signService = $signService;
 	}
 
-	public function saveSettings() {
-		// Remove trailing slash in servers urls
-		$serversUrls = $this->request->getParam('server_urls');
-		foreach ($serversUrls as $idxServer => $serverUrl) {
-			$serversUrls[$idxServer] = rtrim($serverUrl, '/');
-		}
+	public function checkCronStatus()
+	{
+		$resp = $this->signService->lastJobRun();
 
-		// $this->config->setAppValue('yumisign_nextcloud', 'server_urls', json_encode($this->request->getParam('server_urls')));
-		$this->config->setAppValue('yumisign_nextcloud', 'server_urls', json_encode($serversUrls));
-		$this->config->setAppValue('yumisign_nextcloud', 'api_key', $this->request->getParam('api_key'));
-		$this->config->setAppValue('yumisign_nextcloud', 'use_proxy', $this->request->getParam('use_proxy'));
-		$this->config->setAppValue('yumisign_nextcloud', 'proxy_host', $this->request->getParam('proxy_host'));
-		$this->config->setAppValue('yumisign_nextcloud', 'proxy_port', $this->request->getParam('proxy_port'));
-		$this->config->setAppValue('yumisign_nextcloud', 'proxy_username', $this->request->getParam('proxy_username'));
-		$this->config->setAppValue('yumisign_nextcloud', 'proxy_password', $this->request->getParam('proxy_password'));
-		$this->config->setAppValue('yumisign_nextcloud', 'sign_scope', $this->request->getParam('sign_scope'));
-		$this->config->setAppValue('yumisign_nextcloud', 'async_timeout', $this->request->getParam('async_timeout'));
-		$this->config->setAppValue('yumisign_nextcloud', 'cron_interval', $this->request->getParam('cron_interval'));
+		return new JSONResponse([
+			YMS_CODE	=> $resp[YMS_CODE],
+			YMS_STATUS	=> $resp[YMS_STATUS],
+			YMS_MESSAGE => $resp[YMS_MESSAGE]
+		]);
+	}
+
+	public function checkServerUrl()
+	{
+		$resp = $this->signService->checkServerUrl($this->request);
+
+		return new JSONResponse([
+			YMS_CODE	=> $resp[YMS_CODE],
+			YMS_STATUS	=> $resp[YMS_STATUS],
+			YMS_ID		=> $resp[YMS_ID],
+			YMS_MESSAGE => $resp[YMS_MESSAGE]
+		]);
+	}
+
+	/**
+	 * @NoAdminRequired
+	 */
+	public function checkSettings()
+	{
+		$serverUrl = $this->config->getAppValue('yumisign_nextcloud', 'server_url');
+		$empty = empty($serverUrl);
+
+		return new JSONResponse(!$empty);
+	}
+
+	public function checkWorkspace()
+	{
+		$resp = $this->signService->checkWorkspace($this->request);
+
+		return new JSONResponse([
+			YMS_CODE	=> $resp[YMS_CODE],
+			YMS_STATUS	=> $resp[YMS_STATUS],
+			YMS_ID		=> $resp[YMS_ID],
+			YMS_LIST_ID	=> $resp[YMS_LIST_ID],
+			YMS_MESSAGE => $resp[YMS_MESSAGE]
+		]);
+	}
+
+	public function resetJob()
+	{
+		$resp = $this->signService->resetJob();
+
+		return new JSONResponse([
+			YMS_CODE	=> $resp[YMS_CODE],
+			YMS_STATUS	=> $resp[YMS_STATUS],
+			YMS_MESSAGE => $resp[YMS_MESSAGE]
+		]);
+	}
+
+	public function saveSettings()
+	{
+		$this->config->setAppValue('yumisign_nextcloud', 'api_key',			$this->request->getParam('api_key'));
+		$this->config->setAppValue('yumisign_nextcloud', 'async_timeout',	$this->request->getParam('async_timeout'));
+		$this->config->setAppValue('yumisign_nextcloud', 'cron_interval',	$this->request->getParam('cron_interval'));
+		$this->config->setAppValue('yumisign_nextcloud', 'proxy_host',		$this->request->getParam('proxy_host'));
+		$this->config->setAppValue('yumisign_nextcloud', 'proxy_password',	$this->request->getParam('proxy_password'));
+		$this->config->setAppValue('yumisign_nextcloud', 'proxy_port',		$this->request->getParam('proxy_port'));
+		$this->config->setAppValue('yumisign_nextcloud', 'proxy_username',	$this->request->getParam('proxy_username'));
+		$this->config->setAppValue('yumisign_nextcloud', 'server_url',		rtrim($this->request->getParam('server_url'), '/'));
+		$this->config->setAppValue('yumisign_nextcloud', 'sign_scope',		$this->request->getParam('sign_scope'));
+		$this->config->setAppValue('yumisign_nextcloud', 'use_proxy',		$this->request->getParam('use_proxy'));
+		$this->config->setAppValue('yumisign_nextcloud', 'workspace_id',	$this->request->getParam('workspace_id'));
+		$this->config->setAppValue('yumisign_nextcloud', 'workspace_name',	$this->request->getParam('workspace_name'));
+		$this->config->setAppValue('yumisign_nextcloud', 'description',		$this->request->getParam('description'));
 
 		return new JSONResponse([
 			'code' => 1,
 		]);
-	}
-
-	public function checkServerUrl() {
-		$resp = $this->signService->yumisignStatus($this->request);
-
-		if (isset($resp['status'])) {
-			return new JSONResponse([
-				'status' => $resp['status'],
-				'message' => $resp['message']
-			]);
-		}
-
-		return new JSONResponse([
-			'status' => 'false',
-			'message' => ''
-		]);
-	}
-
-		/**
-	 * @NoAdminRequired
-	 */
-	public function checkSettings() {
-		$serverUrls = json_decode($this->config->getAppValue('yumisign_nextcloud', 'server_urls', '[]'));
-		$empty = true;
-
-		foreach ($serverUrls as &$serverUrl) {
-			if (!empty($serverUrl)) {
-				$empty = false;
-				break;
-			}
-		}
-
-		return new JSONResponse(!$empty);
 	}
 }

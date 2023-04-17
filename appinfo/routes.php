@@ -24,13 +24,13 @@ return [
 		['name' => 'sign#getLocalUsers', 'url' => '/get_local_users', 'verb' => 'GET'],
 
 		['name' => 'settings#saveSettings', 'url' => '/settings', 'verb' => 'POST'],
-		['name' => 'settings#checkServerUrl', 'url' => '/check_server_url', 'verb' => 'POST'],
-		['name' => 'settings#checkSettings', 'url' => '/check_settings', 'verb' => 'GET'],
+		['name' => 'settings#checkCronStatus',		'url' => '/check_cron_status',		'verb' => 'POST'],
+		['name' => 'settings#checkServerUrl',		'url' => '/check_server_url',		'verb' => 'POST'],
+		['name' => 'settings#checkWorkspace',		'url' => '/check_wspname_id',		'verb' => 'POST'],
+		['name' => 'settings#checkSettings',		'url' => '/check_settings',			'verb' => 'GET'],
+		['name' => 'settings#resetJob',				'url' => '/reset_job',				'verb' => 'POST'],
 
 		['name' => 'requests#getPendingRequests', 'url' => '/pending_requests', 'verb' => 'GET'],
 		['name' => 'requests#getIssuesRequests', 'url' => '/issues_requests', 'verb' => 'GET'],
-
-		// TODO : test to remove
-		['name' => 'sign#testing', 'url' => '/0YDOxFQJn7CmP0V1Yx5pqQUATtaCWMeXFiJvEo2DIJlElLNYRVklKFQZ1Z5Et9ULwtfSIjww4BqDdir8FMVtS6BS6zJdS3Ff3bhMxMyswhKoGGNLQ', 'verb' => 'GET'],
 	],
 ];

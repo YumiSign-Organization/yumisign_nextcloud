@@ -1,7 +1,7 @@
 <?php
 /**
  *
- * @copyright Copyright (c) 2021, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -43,22 +43,25 @@ class AdminSettings implements ISettings {
      */
     public function getForm() {
         return new TemplateResponse('yumisign_nextcloud', 'settings/admin', [
-            'server_urls' => $this->config->getAppValue('yumisign_nextcloud', 'server_urls', '[]'),
-            'api_key' => $this->config->getAppValue('yumisign_nextcloud', 'api_key', 'Write here the API key from YumiSign'),
-            'default_domain' => $this->config->getAppValue('yumisign_nextcloud', 'default_domain'),
-            'user_settings' => $this->config->getAppValue('yumisign_nextcloud', 'user_settings'),
-            'use_proxy' => $this->config->getAppValue('yumisign_nextcloud', 'use_proxy'),
-            'proxy_host' => $this->config->getAppValue('yumisign_nextcloud', 'proxy_host'),
-            'proxy_port' => $this->config->getAppValue('yumisign_nextcloud', 'proxy_port'),
-            'proxy_username' => $this->config->getAppValue('yumisign_nextcloud', 'proxy_username'),
-            'proxy_password' => $this->config->getAppValue('yumisign_nextcloud', 'proxy_password'),
-            'sign_scope' => $this->config->getAppValue('yumisign_nextcloud', 'sign_scope', 'Global'),
-            'signed_file' => $this->config->getAppValue('yumisign_nextcloud', 'signed_file', 'copy'),
-            'sync_timeout' => $this->config->getAppValue('yumisign_nextcloud', 'sync_timeout', 2),
-            'async_timeout' => $this->config->getAppValue('yumisign_nextcloud', 'async_timeout', 1),
-            'cron_interval' => $this->config->getAppValue('yumisign_nextcloud', 'cron_interval', 5),
-            'enable_demo_mode' => $this->config->getAppValue('yumisign_nextcloud', 'enable_demo_mode'),
-            'watermark_text' => $this->config->getAppValue('yumisign_nextcloud', 'watermark_text', 'RCDEVS - SPECIMEN - YUMISIGN'),
+            'server_url' =>         $this->config->getAppValue('yumisign_nextcloud', 'server_url'),
+            'api_key' =>            $this->config->getAppValue('yumisign_nextcloud', 'api_key'),
+            'workspace_id' =>       $this->config->getAppValue('yumisign_nextcloud', 'workspace_id'),
+            'workspace_name' =>     $this->config->getAppValue('yumisign_nextcloud', 'workspace_name'),
+            'description' =>        $this->config->getAppValue('yumisign_nextcloud', 'description'),
+            'default_domain' =>     $this->config->getAppValue('yumisign_nextcloud', 'default_domain'),
+            'user_settings' =>      $this->config->getAppValue('yumisign_nextcloud', 'user_settings'),
+            'use_proxy' =>          $this->config->getAppValue('yumisign_nextcloud', 'use_proxy'),
+            'proxy_host' =>         $this->config->getAppValue('yumisign_nextcloud', 'proxy_host'),
+            'proxy_port' =>         $this->config->getAppValue('yumisign_nextcloud', 'proxy_port'),
+            'proxy_username' =>     $this->config->getAppValue('yumisign_nextcloud', 'proxy_username'),
+            'proxy_password' =>     $this->config->getAppValue('yumisign_nextcloud', 'proxy_password'),
+            'sign_scope' =>         $this->config->getAppValue('yumisign_nextcloud', 'sign_scope', 'Global'),
+            'signed_file' =>        $this->config->getAppValue('yumisign_nextcloud', 'signed_file', 'copy'),
+            'sync_timeout' =>       $this->config->getAppValue('yumisign_nextcloud', 'sync_timeout', 2),
+            'async_timeout' =>      $this->config->getAppValue('yumisign_nextcloud', 'async_timeout', 1),
+            'cron_interval' =>      $this->config->getAppValue('yumisign_nextcloud', 'cron_interval', 5),
+            'enable_demo_mode' =>   $this->config->getAppValue('yumisign_nextcloud', 'enable_demo_mode'),
+            'watermark_text' =>     $this->config->getAppValue('yumisign_nextcloud', 'watermark_text', 'RCDEVS - SPECIMEN - YUMISIGN'),
         ], 'blank');
     }
 
