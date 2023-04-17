@@ -16,16 +16,16 @@ YumiSign eSignature is recognized by all jurisdictions and complies with Europea
 * Qualified Electronic Signature with our YumiSign Card Reader for IOS & Android
 ]]></description>
     <screenshot>
-        img/screenshots/screenshot-menu.png
+        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/v1.0.0/img/screenshots/screenshot-menu.png
     </screenshot>
     <screenshot>
-        img/screenshots/screenshot-modal.png
+        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/v1.0.0/img/screenshots/screenshot-modal.png
     </screenshot>
     <screenshot>
-        img/screenshots/screenshot-modal-sign-types.png
+        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/v1.0.0/img/screenshots/screenshot-modal-sign-types.png
     </screenshot>
     <screenshot>
-        img/screenshots/screenshot-notifications.png
+        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/v1.0.0/img/screenshots/screenshot-notifications.png
     </screenshot>
     <version>1.0.0</version>
     <licence>agpl</licence>
