@@ -1,4 +1,4 @@
-1.1.2
+1.1.3
 	Complete rebuild to match to version 28 of Nextcloud
 	NB: Notifications are temporary disabled; no impact on saving files with cron
 
