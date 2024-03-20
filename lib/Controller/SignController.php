@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -25,21 +25,27 @@ namespace OCA\YumiSignNxtC\Controller;
 
 use \OCP\AppFramework\Http\RedirectResponse;
 use Exception;
+use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
 use OCA\YumiSignNxtC\Db\SignSession;
 use OCA\YumiSignNxtC\Db\SignSessionMapper;
+use OCA\YumiSignNxtC\Service\Constante;
+use OCA\YumiSignNxtC\Service\Cst;
 use OCA\YumiSignNxtC\Service\CurlResponse;
 use OCA\YumiSignNxtC\Service\SignService;
 use OCA\YumiSignNxtC\Utility\Utility;
-
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
+use OCP\Collaboration\Collaborators\ISearch;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 use OCP\IUserManager;
+use OCP\IUserSession;
 use OCP\Notification\IManager;
+use OCP\Share\IShare;
 use OCP\Util;
-
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\JsonResponse as HttpFoundationJsonResponse;
 
 class SignController extends Controller
 {
@@ -52,8 +58,18 @@ class SignController extends Controller
 	/** @var IUserManager */
 	private $userManager;
 
-	public function __construct($AppName, IRequest $request, SignService $signService, $UserId, LoggerInterface $logger, SignSessionMapper $mapper, IUserManager $userManager)
-	{
+	public function __construct(
+		$AppName,
+		IRequest $request,
+		SignService $signService,
+		$UserId,
+		LoggerInterface $logger,
+		SignSessionMapper $mapper,
+		IUserManager $userManager,
+		private ISearch $search,
+		private IUserSession $userSession,
+		private IURLGenerator $urlGenerator,
+	) {
 		parent::__construct($AppName, $request);
 		$this->userId = $UserId;
 		$this->signService = $signService;
@@ -69,28 +85,47 @@ class SignController extends Controller
 	public function mobileSign()
 	{
 		// Retrieve current user email from Nextcloud database
-		$receiver = $this->userManager->get($this->userId);
+		$currentUser = $this->userManager->get($this->userId);
 
-		if (empty($receiver->getEMailAddress()) && empty($this->request->getParam('email'))) {
+		// If userId is an email, not needed to search an email...
+		if (filter_var($this->userId, FILTER_VALIDATE_EMAIL)) {
+			$currentUserEmail = $this->userId;
+		} else {
+			$currentUserEmail = $currentUser->getEMailAddress();
+		}
+
+
+		if (empty($currentUserEmail) && empty($this->request->getParam('email'))) {
 			$resp['code'] = false;
 			$resp['message'] = "No email address found for this user";
 		} else {
-			$resp = $this->signService->asyncExternalMobileSignPrepare($this->request->getParam('path'), $receiver->getEMailAddress(), $this->userId, $this->request->getParam('appUrl'), $this->request->getParam('signatureType'));
+			$resp = $this->signService->asyncExternalMobileSignPrepare(
+				$this->request->getParam('path'),
+				$currentUserEmail,
+				$this->userId,
+				$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
+				$this->request->getParam('signatureType'),
+				$this->request->getParam('fileId')
+			);
 
 			// Squeeze Designer if signature type is not SIMPLE
-			if (strcasecmp($this->request->getParam('signatureType'), YMS_SIMPLE) !== 0) {
-				$resp = $this->signService->asyncExternalMobileSignSubmit($resp['workspaceId'], $resp['workflowId'], $resp['envelopeId']);
+			if (strcasecmp($this->request->getParam('signatureType'), Constante::get(Cst::YMS_SIMPLE)) !== 0) {
+				$resp = $this->signService->asyncExternalMobileSignSubmit(
+					$resp['workspaceId'],
+					$resp['workflowId'],
+					$resp['envelopeId']
+				);
 			}
 		}
 
 		return new JSONResponse([
 			'code' => $resp['code'],
-			'message'		=> Utility::getArrayData($resp, 'message',     false),
-			'session'		=> Utility::getArrayData($resp, 'session',     false),
-			'designerUrl'	=> Utility::getArrayData($resp, 'designerUrl', false),
-			'workspaceId'	=> Utility::getArrayData($resp, 'workspaceId', false),
-			'workflowId'	=> Utility::getArrayData($resp, 'workflowId',  false),
-			'envelopeId'	=> Utility::getArrayData($resp, 'envelopeId',  false),
+			'message'			=> Utility::getArrayData($resp, 'message',     false),
+			'session'			=> Utility::getArrayData($resp, 'session',     false),
+			'designerUrl'		=> Utility::getArrayData($resp, 'designerUrl', false),
+			'workspaceId'		=> Utility::getArrayData($resp, 'workspaceId', false),
+			'workflowId'		=> Utility::getArrayData($resp, 'workflowId',  false),
+			'envelopeId'		=> Utility::getArrayData($resp, 'envelopeId',  false),
 		]);
 	}
 
@@ -100,22 +135,23 @@ class SignController extends Controller
 	public function asyncLocalMobileSign()
 	{
 		// Retrieve chosen user email from Nextcloud database
-		$receiver = $this->userManager->get($this->request->getParam('username'));
+		$nextcloudUser = $this->userManager->get($this->request->getParam('username'));
 
-		if (empty($receiver->getEMailAddress()) && empty($this->request->getParam('email'))) {
+		if (empty($nextcloudUser->getEMailAddress()) && empty($this->request->getParam('email'))) {
 			$resp['code'] = false;
 			$resp['message'] = "No email address found for this user";
 		} else {
 			$resp = $this->signService->asyncExternalMobileSignPrepare(
 				$this->request->getParam('path'),
-				(empty($receiver->getEMailAddress()) ? $this->request->getParam('email') : $receiver->getEMailAddress()),
+				(empty($nextcloudUser->getEMailAddress()) ? $this->request->getParam('email') : $nextcloudUser->getEMailAddress()),
 				$this->userId,
-				$this->request->getParam('appUrl'),
-				$this->request->getParam('signatureType')
+				$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
+				$this->request->getParam('signatureType'),
+				$this->request->getParam('fileId'),
 			);
 
 			// Squeeze Designer if signature type is not SIMPLE
-			if (strcasecmp($this->request->getParam('signatureType'), YMS_SIMPLE) !== 0) {
+			if (strcasecmp($this->request->getParam('signatureType'), Constante::get(Cst::YMS_SIMPLE)) !== 0) {
 				$resp = $this->signService->asyncExternalMobileSignSubmit($resp['workspaceId'], $resp['workflowId'], $resp['envelopeId']);
 			}
 		}
@@ -140,23 +176,24 @@ class SignController extends Controller
 			$this->request->getParam('path'),
 			$this->request->getParam('email'),
 			$this->userId,
-			$this->request->getParam('appUrl'),
-			$this->request->getParam('signatureType')
+			$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
+			$this->request->getParam('signatureType'),
+			$this->request->getParam('fileId'),
 		);
 
 		// Squeeze Designer if signature type is not SIMPLE
-		if (strcasecmp($this->request->getParam('signatureType'), YMS_SIMPLE) !== 0) {
+		if (strcasecmp($this->request->getParam('signatureType'), Constante::get(Cst::YMS_SIMPLE)) !== 0) {
 			$resp = $this->signService->asyncExternalMobileSignSubmit($resp['workspaceId'], $resp['workflowId'], $resp['envelopeId']);
 		}
 
 		return new JSONResponse([
-			'code'			=> array_key_exists('code', $resp) ? $resp['code'] : '',
-			'message'		=> array_key_exists('message', $resp) ? $resp['message'] : '',
-			'session'		=> array_key_exists('session', $resp) ? $resp['session'] : '',
-			'designerUrl'	=> array_key_exists('designerUrl', $resp) ? $resp['designerUrl'] : '',
-			'workspaceId'	=> array_key_exists('workspaceId', $resp) ? $resp['workspaceId'] : '',
-			'workflowId'	=> array_key_exists('workflowId', $resp) ? $resp['workflowId'] : '',
-			'envelopeId'	=> array_key_exists('envelopeId', $resp) ? $resp['envelopeId'] : '',
+			'code'				=> array_key_exists('code', $resp) ? $resp['code'] : '',
+			'message'			=> array_key_exists('message', $resp) ? $resp['message'] : '',
+			'session'			=> array_key_exists('session', $resp) ? $resp['session'] : '',
+			'designerUrl'		=> array_key_exists('designerUrl', $resp) ? $resp['designerUrl'] : '',
+			'workspaceId'		=> array_key_exists('workspaceId', $resp) ? $resp['workspaceId'] : '',
+			'workflowId'		=> array_key_exists('workflowId', $resp) ? $resp['workflowId'] : '',
+			'envelopeId'		=> array_key_exists('envelopeId', $resp) ? $resp['envelopeId'] : '',
 		]);
 	}
 
@@ -166,10 +203,14 @@ class SignController extends Controller
 	 */
 	public function asyncExternalMobileSignSubmit($workspaceId = null, $workflowId = null, $envelopeId = null, $url = null)
 	{
-		if (!is_null($workspaceId) && !is_null($workflowId) && !is_null($envelopeId) && !is_null($url)) {
-			$resp = $this->signService->asyncExternalMobileSignSubmit($workspaceId, $workflowId, $envelopeId);
+		try {
+			if (!is_null($workspaceId) && !is_null($workflowId) && !is_null($envelopeId) && !is_null($url)) {
+				$resp = $this->signService->asyncExternalMobileSignSubmit($workspaceId, $workflowId, $envelopeId);
 
-			return new RedirectResponse($url);
+				return new RedirectResponse($url);
+			}
+		} catch (\Throwable $th) {
+			return $th->getMessage();
 		}
 	}
 
@@ -198,37 +239,6 @@ class SignController extends Controller
 			'code' => strval($resp['code']),
 			'message' => $resp['message']
 		]);
-	}
-
-	/**
-	 * @NoAdminRequired
-	 */
-	public function getLocalUsers()
-	{
-		$cm = \OC::$server->getContactsManager();
-
-		// The API is not active -> nothing to do
-		if (!$cm->isEnabled()) {
-			$this->logger->error('Contact Manager not enabled');
-			return new JSONResponse();
-		}
-
-		$result = $cm->search($this->request->getParam('searchQuery'), array('FN', 'EMAIL'));
-
-		$contacts = array();
-		foreach ($result as $raw_contact) {
-			$contact = array();
-			$contact['uid'] = $raw_contact['UID'];
-			$contact['display_name'] = $raw_contact['FN'];
-
-			if (array_key_exists('EMAIL', $raw_contact)) {
-				$contact['email'] = $raw_contact['EMAIL'][0];
-			}
-
-			array_push($contacts, $contact);
-		}
-
-		return new JSONResponse($contacts);
 	}
 
 	/**

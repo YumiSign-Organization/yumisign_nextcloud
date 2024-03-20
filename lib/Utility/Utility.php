@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -48,6 +48,41 @@ class Utility
 			}
 		}
 	}
+
+	public static function getIfExists(string $field, array|object $requestIntel, bool $returnNull = true)
+	{
+		try {
+			$returnValue = ($returnNull ? null : '');
+
+			switch (true) {
+				case is_array($requestIntel):
+
+					if (array_key_exists($field, $requestIntel)) {
+						return $requestIntel[$field];
+					} else {
+						return $returnValue;
+					}
+					break;
+
+				case is_object($requestIntel):
+					foreach ($requestIntel as $key => $value) {
+						if ($key === $field) {
+							return $value;
+							break;
+						}
+					}
+					return $returnValue; //Not found here...
+					break;
+
+				default:
+					return $returnValue;
+					break;
+			}
+		} catch (\Throwable $th) {
+			return $returnValue;
+		}
+	}
+
 
 	public static function warning(string $warningMsg)
 	{

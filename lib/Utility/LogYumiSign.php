@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -25,17 +25,109 @@ namespace OCA\YumiSignNxtC\Utility;
 
 use Exception;
 use OC\Config;
-use OCA\Activity\AppInfo\Application;
-use OCP\IConfig;
 use OC\Server;
 use OC\SystemConfig;
+use OCA\Activity\AppInfo\Application;
+use OCA\Certificate24\AppInfo\Application as AppInfoApplication;
+use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
+use OCP\IConfig;
+use Psr\Log\LoggerInterface;
+
+use function OCP\Log\logger;
 
 class LogYumiSign
 {
-	public static function write($logMsg, $functionName, $throw = false)
+
+	private string $appName = YumiSignApp::APP_ID;
+	private string|null $logYms;
+	private $logFile;
+
+	public function __construct(private LoggerInterface $logger)
 	{
-		$dataFolder = rtrim(\OC::$server->get(SystemConfig::class)->getValue('datadirectory', false), DIRECTORY_SEPARATOR);
-		error_log(sprintf("[%s] [YumiSign-Nextcloud] [%s] %s\n", date("Y-m-d H:i:s"), $functionName, $logMsg), 3, $dataFolder . DIRECTORY_SEPARATOR . "YumiSignNxtC.log");
+		try {
+			$this->logYms = null;
+			$logYumisign = rtrim(\OC::$server->get(SystemConfig::class)->getValue('log_yumisign', false), DIRECTORY_SEPARATOR);
+
+			if ($logYumisign) {
+				// Check if folder exists
+				if (!is_dir($logYumisign)) {
+					$this->createDirectory($logYumisign);
+				}
+
+				$logYumisignFile = "{$logYumisign}/{$this->appName}.log";
+				
+				// Check if file exists
+				if (!file_exists($logYumisignFile)) {
+					file_put_contents($logYumisignFile, '');
+				}
+
+				if (is_writable($logYumisignFile)) {
+					$this->logYms = $logYumisignFile;
+				} else {
+					$this->logYms = null;
+				}
+			} else {
+				$this->logYms = null;
+			}
+
+			if (!is_null($this->logYms)) {
+				$this->logFile = fopen($this->logYms, 'a');
+			}
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public function __destruct()
+	{
+		if ($this->logFile) {
+			fclose($this->logFile);
+		}
+	}
+
+	public function debug(string $logMsg, string $functionName = '', bool $throw = false): void
+	{
+		$this->write($logMsg, __FUNCTION__, $functionName, $throw);
+	}
+
+	public function info(string $logMsg, string $functionName = '', bool $throw = false): void
+	{
+		$this->write($logMsg, __FUNCTION__, $functionName, $throw);
+	}
+
+	public function warning(string $logMsg, string $functionName = '', bool $throw = false): void
+	{
+		$this->write($logMsg, __FUNCTION__, $functionName, $throw);
+	}
+
+	public function error(string $logMsg, string $functionName = '', bool $throw = false): void
+	{
+		$this->write($logMsg, __FUNCTION__, $functionName, $throw);
+	}
+
+	public function critical(string $logMsg, string $functionName = '', bool $throw = false): void
+	{
+		$this->write($logMsg, __FUNCTION__, $functionName, $throw);
+	}
+
+	private function write(string $logMsg, string $callerFunction, string $functionName = '', bool $throw = false): void
+	{
+		if (!is_null($this->logYms)) {
+			fwrite($this->logFile, sprintf("[%s] [YumiSign-Nextcloud] [%s] [%s] %s\n", date("Y-m-d H:i:s"), strtoupper($callerFunction), $functionName, $logMsg));
+		} else {
+			// Standard login
+			$this->logger->$callerFunction($logMsg);
+		}
 		if ($throw) throw new Exception($logMsg, 1);
+	}
+
+	private function createDirectory(string $directoryName): bool
+	{
+		try {
+			mkdir($directoryName, 0770, true);
+		} catch (\Throwable $th) {
+			//throw $th;
+		}
+		return is_dir($directoryName);
 	}
 }

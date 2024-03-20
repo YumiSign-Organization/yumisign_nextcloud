@@ -30,11 +30,18 @@ class Version000000Date_20230227_093500 extends SimpleMigrationStep
 
         $table = $schema->getTable('yumisign_nxtc_sess');
 
-        $table->addColumn('expiry_date_lower', 'bigint', [
-            'autoincrement' => false,
-            'unsigned' => true,
-            'notnull' => true,
-        ]);
+        /**
+         * ###### Fri Mar 15 07:48:10 CET 2024
+         * Add check phase before altering table => issue reported for RCDevs Support
+         * Cause : maybe manual DB updates/deletions
+         */
+        if (!$table->hasColumn('expiry_date_lower')) {
+            $table->addColumn('expiry_date_lower', 'bigint', [
+                'autoincrement' => false,
+                'unsigned' => true,
+                'notnull' => true,
+            ]);
+        }
 
         return $schema;
     }

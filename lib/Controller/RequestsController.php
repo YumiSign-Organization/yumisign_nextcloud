@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -23,23 +23,44 @@
 
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCP\IRequest;
-use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http\JSONResponse;
 
+use \OCP\AppFramework\Http\RedirectResponse;
+use Exception;
+use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
 use OCA\YumiSignNxtC\Db\SignSession;
 use OCA\YumiSignNxtC\Db\SignSessionMapper;
+use OCA\YumiSignNxtC\Service\Constante;
+use OCA\YumiSignNxtC\Service\Cst;
+use OCA\YumiSignNxtC\Service\CurlResponse;
+use OCA\YumiSignNxtC\Service\RequestsService;
+use OCA\YumiSignNxtC\Service\SignService;
+use OCA\YumiSignNxtC\Utility\Utility;
+use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\TemplateResponse;
+use OCP\Collaboration\Collaborators\ISearch;
+use OCP\IRequest;
+use OCP\IURLGenerator;
+use OCP\IUserManager;
+use OCP\IUserSession;
+use OCP\Notification\IManager;
+use OCP\Share\IShare;
+use OCP\Util;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\JsonResponse as HttpFoundationJsonResponse;
 
 class RequestsController extends Controller
 {
-	private $userId;
-	private $mapper;
 
-	public function __construct($AppName, IRequest $request, $UserId, SignSessionMapper $mapper)
-	{
+	public function __construct(
+		$AppName,
+		IRequest $request,
+		private string $userId,
+		private SignSessionMapper $mapper,
+		private RequestsService $requestsService,
+		private SignService $signService,
+	) {
 		parent::__construct($AppName, $request);
-		$this->userId = $UserId;
-		$this->mapper = $mapper;
 	}
 
 	/**
@@ -47,14 +68,24 @@ class RequestsController extends Controller
 	 */
 	public function getPendingRequests(int $page = 0, int $nbItems = 20)
 	{
+		$returned = [
+			'count' => 0,
+			'requests' => [],
+		];
 
-		$count = $this->mapper->countPendingsByApplicant($this->userId);
-		$requests = $this->mapper->findPendingsByApplicant($this->userId, $page, $nbItems);
+		try {
+			if ($nbItems == 0) {
+				$nbItems = 20;
+			}
 
-		return new JSONResponse([
-			'count' => $count,
-			'requests' => $requests,
-		]);
+			$returned = $this->requestsService->getPendingRequests($this->userId, $page, $nbItems);
+		} catch (\Throwable $th) {
+			$returned = [
+				'count' => 0,
+				'requests' => null,
+			];
+		}
+		return new JSONResponse($returned);
 	}
 
 	/**
@@ -62,9 +93,20 @@ class RequestsController extends Controller
 	 */
 	public function getIssuesRequests(int $page = 0, int $nbItems = 20)
 	{
+		if ($nbItems == 0) {
+			$nbItems = 20;
+		}
+		// Retrieve all WFW from YMS and update global_status and status according to the records
+		$this->signService->checkAsyncSignatureTask($this->userId);
 
 		$count = $this->mapper->countIssuesByApplicant($this->userId);
 		$requests = $this->mapper->findIssuesByApplicant($this->userId, $page, $nbItems);
+
+		// Change fullPath to basename
+		$requests = json_decode(json_encode($requests), true);
+		foreach ($requests as $keyRequest => $unitRequest) {
+			$requests[$keyRequest]['file_path'] = basename($unitRequest['file_path']);
+		}
 
 		return new JSONResponse([
 			'count' => $count,

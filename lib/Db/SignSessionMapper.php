@@ -1,37 +1,226 @@
 <?php
 
+/**
+ *
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ *
+ * @license GNU AGPL version 3 or any later version
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 namespace OCA\YumiSignNxtC\Db;
 
+use DateTime;
+use OC\SystemConfig;
+use OCA\YumiSignNxtC\Service\Constante;
+use OCA\YumiSignNxtC\Service\Cst;
+use OCA\YumiSignNxtC\Service\Entity;
+use OCA\YumiSignNxtC\Service\Status;
+use OCA\YumiSignNxtC\Utility\Utility;
+use OCA\YumiSignNxtC\Utility\LogYumiSign;
 use OCP\IDBConnection;
+use OCP\AppFramework\Db\QBMap1per;
 use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\IResult;
+use OCP\DB\QueryBuilder\IQueryBuilder;
 
 class SignSessionMapper extends QBMapper
 {
 
-    private IDBConnection $dbJobs;
+    public int $maxItems = 50;
+    public int $backInTime = 3600; // Use to find users' last activity and to reduce the number of retrieved transactions
+    private string $tablesPrefix;
+    private string $tableAlias = 'ymsSess';
 
-    public function __construct(IDBConnection $db)
-    {
-        parent::__construct($db, 'yumisign_nxtc_sess', SignSession::class);
+    public function __construct(
+        IDBConnection $db,
+        private LogYumiSign $logYumiSign,
+    ) {
+        parent::__construct(
+            $db,
+            'yumisign_nxtc_sess',
+            SignSession::class
+        );
         $this->db = $db;
+        $this->tablesPrefix = \OC::$server->get(SystemConfig::class)->getValue('dbtableprefix', 'oc_');
+    }
+
+    /**
+     * Query completions
+     */
+    private function commonSetParameter(array|null $unitTransactionToUpdate, string $paramName, IQueryBuilder &$queryBuilder)
+    {
+        if (
+            !is_null($unitTransactionToUpdate) &&
+            array_key_exists($paramName, $unitTransactionToUpdate) &&
+            !is_null($unitTransactionToUpdate[$paramName])
+        )
+            $queryBuilder
+                ->set($paramName, $queryBuilder->createParameter($paramName))
+                ->setParameter($paramName, $unitTransactionToUpdate[$paramName]);
+    }
+
+    private function setApplicantIdIfExists(array|null $unitTransactionToUpdate, IQueryBuilder &$queryBuilder)
+    {
+        $this->commonSetParameter($unitTransactionToUpdate, Constante::entity(Entity::APPLICANT_ID), $queryBuilder);
+    }
+
+    private function setEnvelopeIdIfExists(array|null $unitTransactionToUpdate, IQueryBuilder &$queryBuilder)
+    {
+        $this->commonSetParameter($unitTransactionToUpdate, Constante::entity(Entity::ENVELOPE_ID), $queryBuilder);
+    }
+
+    private function setStatusIfExists(array|null $unitTransactionToUpdate, IQueryBuilder &$queryBuilder)
+    {
+        $this->commonSetParameter($unitTransactionToUpdate, Constante::entity(Entity::STATUS), $queryBuilder);
+    }
+
+    private function setGlobalStatusIfExists(array|null $unitTransactionToUpdate, IQueryBuilder &$queryBuilder)
+    {
+        $this->commonSetParameter($unitTransactionToUpdate, Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder);
+    }
+
+    private function whereApplicantIfExists(string|null $applicantId, IQueryBuilder &$queryBuilder)
+    {
+        if (!is_null($applicantId)) {
+            $queryBuilder->andWhere($queryBuilder->expr()->eq('applicant_id', $queryBuilder->createNamedParameter($applicantId, IQueryBuilder::PARAM_STR)));
+        }
+    }
+
+    private function whereRecipientIfExists(string|null $recipient, IQueryBuilder &$queryBuilder)
+    {
+        if (!is_null($recipient)) {
+            $queryBuilder->andWhere($queryBuilder->expr()->eq('recipient', $queryBuilder->createNamedParameter($recipient, IQueryBuilder::PARAM_STR)));
+        }
+    }
+
+    private function whereGlobalStatusActive(IQueryBuilder &$queryBuilder)
+    {
+        // AND condition
+        $queryBuilder->andWhere(
+            $queryBuilder->expr()->andX(
+                $queryBuilder->expr()->neq(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createNamedParameter(Constante::status(Status::CANCELED))),
+                $queryBuilder->expr()->neq(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createNamedParameter(Constante::status(Status::NOT_APPLICABLE))),
+                $queryBuilder->expr()->neq(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createNamedParameter(Constante::status(Status::NOT_FOUND))),
+                $queryBuilder->expr()->neq(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createNamedParameter(Constante::status(Status::SIGNED))),
+            )
+        );
+    }
+
+    private function whereGlobalStatusPending(IQueryBuilder &$queryBuilder)
+    {
+        // OR condition
+        $queryBuilder->andWhere(
+            $queryBuilder->expr()->orX(
+                $queryBuilder->expr()->eq(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createNamedParameter(Constante::status(Status::APPROVED))),
+                $queryBuilder->expr()->eq(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createNamedParameter(Constante::status(Status::STARTED))),
+            )
+        );
+    }
+
+    private function whereExpiryDate(int $rightNow, IQueryBuilder &$queryBuilder)
+    {
+        $queryBuilder->andWhere($queryBuilder->expr()->gte(Constante::entity(Entity::EXPIRY_DATE), $queryBuilder->createNamedParameter(strval($rightNow), IQueryBuilder::PARAM_INT)));
+    }
+
+    private function joinActivity(IQueryBuilder &$queryBuilder)
+    {
+        $queryBuilder->join(
+            $this->tableAlias,
+            'authtoken',
+            'nxcToken',
+            "nxcToken.uid = {$this->tableAlias}.applicant_id"
+        );
+    }
+
+    private function whereLastActivity(int $rightNow, IQueryBuilder &$queryBuilder)
+    {
+        $queryBuilder->andWhere('nxcToken.last_activity >= :paramLastActivityBackInTime')
+            ->setParameter('paramLastActivityBackInTime', intval($rightNow) - $this->backInTime, IQueryBuilder::PARAM_INT);
+    }
+
+    private function whereChangeStatus(int $rightNow, IQueryBuilder &$queryBuilder)
+    {
+        $queryBuilder->andWhere($queryBuilder->expr()->lt(Constante::entity(Entity::CHANGE_STATUS), $queryBuilder->createNamedParameter(strval($rightNow), IQueryBuilder::PARAM_INT)));
+    }
+
+    /**
+     * DB Ops
+     */
+
+    public function countTransactions(int $rightNow, string $applicantId = null): array
+    {
+        $returned = [];
+
+        try {
+            /** @var IResult $result */
+            /** @var IQueryBuilder $queryBuilder */
+
+            $queryBuilder = $this->db->getQueryBuilder();
+
+            $queryBuilder->selectAlias($queryBuilder->createFunction('COUNT(*)'), 'count')
+                ->from($this->getTableName(), $this->tableAlias)
+                ->where('1 = 1'); // Permits to use functions with andWhere conditions
+
+            // Add more filters to prevent huge data
+            $this->joinActivity($queryBuilder);
+
+            $this->whereApplicantIfExists($applicantId, $queryBuilder);
+            $this->whereLastActivity($rightNow, $queryBuilder);
+            $this->whereGlobalStatusActive($queryBuilder);
+            $this->whereExpiryDate($rightNow, $queryBuilder);
+            $this->whereChangeStatus($rightNow, $queryBuilder);
+
+            $result = $queryBuilder->executeQuery();
+            $count = $result->fetchOne();
+            $result->closeCursor();
+
+            $returned = [
+                Constante::get(Cst::CODE)   => 1,
+                Constante::get(Cst::DATA)   => $count,
+                Constante::get(Cst::ERROR)  => null,
+            ];
+        } catch (\Throwable $th) {
+            $returned = [
+                Constante::get(Cst::CODE)   => 0,
+                Constante::get(Cst::DATA)   => null,
+                Constante::get(Cst::ERROR)  => $th->getMessage(),
+            ];
+            $this->logYumiSign->error("Query building failed : {$th->getMessage()}", __FUNCTION__);
+        }
+
+        return $returned;
     }
 
     public function countIssuesByApplicant(string $applicantId)
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select($qb->createFunction('COUNT(*)'))
+        $queryBuilder->select($queryBuilder->createFunction('COUNT(*)'))
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('applicant_id', $qb->createNamedParameter($applicantId)))
+            ->where($queryBuilder->expr()->eq('applicant_id', $queryBuilder->createNamedParameter($applicantId)))
             ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_DECLINED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_CANCELED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_EXPIRED)),
+                $queryBuilder->expr()->orX(
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::DECLINED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::CANCELED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::EXPIRED))),
                 )
             );
 
-        $result = $qb->executeQuery();
+        $result = $queryBuilder->executeQuery();
         $count = $result->fetchOne();
         $result->closeCursor();
 
@@ -40,41 +229,20 @@ class SignSessionMapper extends QBMapper
 
     public function countIssuesByEnvelopeId(string $envelopeId)
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select($qb->createFunction('COUNT(*)'))
+        $queryBuilder->select($queryBuilder->createFunction('COUNT(*)'))
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('envelope_id', $qb->createNamedParameter($envelopeId)))
+            ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)))
             ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_DECLINED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_CANCELED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_EXPIRED)),
+                $queryBuilder->expr()->orX(
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::DECLINED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::CANCELED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::EXPIRED))),
                 )
             );
 
-        $result = $qb->executeQuery();
-        $count = $result->fetchOne();
-        $result->closeCursor();
-
-        return $count;
-    }
-
-    public function countPendingsByApplicant(string $applicantId)
-    {
-        $qb = $this->db->getQueryBuilder();
-
-        $qb->select($qb->createFunction('COUNT(*)'))
-            ->from($this->getTableName())
-            ->where($qb->expr()->eq('applicant_id', $qb->createNamedParameter($applicantId)))
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_APPROVED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_STARTED)),
-                )
-            );
-
-        $result = $qb->executeQuery();
+        $result = $queryBuilder->executeQuery();
         $count = $result->fetchOne();
         $result->closeCursor();
 
@@ -83,171 +251,372 @@ class SignSessionMapper extends QBMapper
 
     public function countTransactionsByEnvelopeId(string $envelopeId)
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select($qb->createFunction('COUNT(*)'))
+        $queryBuilder->select($queryBuilder->createFunction('COUNT(*)'))
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('envelope_id', $qb->createNamedParameter($envelopeId)));
+            ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)));
 
-        $result = $qb->executeQuery();
+        $result = $queryBuilder->executeQuery();
         $count = $result->fetchOne();
         $result->closeCursor();
 
         return $count;
     }
 
-    public function deleteTransactions(string $envelopeId, $recipient = '')
+    public function deleteTransactions(string $envelopeId, $recipient = ''): void
     {
-        $qb = $this->db->getQueryBuilder();
-        $qb->delete('yumisign_nxtc_sess')
-            ->where($qb->expr()->eq('envelope_id', $qb->createNamedParameter($envelopeId)));
+        $queryBuilder = $this->db->getQueryBuilder();
+        $queryBuilder->delete('yumisign_nxtc_sess')
+            ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)));
 
-        if ($recipient !== '') $qb->andWhere($qb->expr()->eq('recipient', $qb->createNamedParameter($recipient)));
+        if ($recipient !== '') $queryBuilder->andWhere($queryBuilder->expr()->eq('recipient', $queryBuilder->createNamedParameter($recipient)));
 
-        $qb->executeStatement();
+        $queryBuilder->executeStatement();
+    }
+
+    public function deleteTransactionByApplicant(string $envelopeId, string $applicant)
+    {
+        $queryBuilder = $this->db->getQueryBuilder();
+        $queryBuilder->delete('yumisign_nxtc_sess')
+            ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)))
+            ->andWhere($queryBuilder->expr()->eq('applicant_id', $queryBuilder->createNamedParameter($applicant)));
+
+        $queryBuilder->executeStatement();
     }
 
     public function findActiveTransaction(string $envelopeId, string $recipient = '')
     {
-        $qb = $this->db->getQueryBuilder();
-        $qb->selectDistinct(
+        $queryBuilder = $this->db->getQueryBuilder();
+        $queryBuilder->selectDistinct(
             ['applicant_id', 'workspace_id', 'workflow_id', 'envelope_id', 'global_status']
         )
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('envelope_id', $qb->createNamedParameter($envelopeId)))
+            ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)))
             ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_APPROVED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_STARTED)),
+                $queryBuilder->expr()->orX(
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::APPROVED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::STARTED))),
                 )
             );
 
-        if ($recipient !== '') $qb->andWhere($qb->expr()->eq('recipient', $qb->createNamedParameter($recipient)));
+        if ($recipient !== '') $queryBuilder->andWhere($queryBuilder->expr()->eq('recipient', $queryBuilder->createNamedParameter($recipient)));
 
-        return $this->findEntity($qb);
+        return $this->findEntity($queryBuilder);
     }
 
     public function findIssuesByApplicant(string $applicantId, int $page = 0, int $nbItems = 20)
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select('*')
+        $queryBuilder->select('*')
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('applicant_id', $qb->createNamedParameter($applicantId)))
+            ->where($queryBuilder->expr()->eq('applicant_id', $queryBuilder->createNamedParameter($applicantId)))
             ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_DECLINED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_CANCELED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_EXPIRED)),
-                    $qb->expr()->andX(
-                        $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_STARTED)),
-                        $qb->expr()->lt('expiry_date',   $qb->createNamedParameter(time())),
+                $queryBuilder->expr()->orX(
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::DECLINED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::CANCELED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::EXPIRED))),
+                    $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::NOT_APPLICABLE))),
+                    $queryBuilder->expr()->andX(
+                        $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::STARTED))),
+                        $queryBuilder->expr()->lt('expiry_date',   $queryBuilder->createNamedParameter(time())),
                     ),
-                    $qb->expr()->andX(
-                        $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_NOT_STARTED)),
-                        $qb->expr()->lt('expiry_date',   $qb->createNamedParameter(time())),
+                    $queryBuilder->expr()->andX(
+                        $queryBuilder->expr()->eq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::NOT_STARTED))),
+                        $queryBuilder->expr()->lt('expiry_date',   $queryBuilder->createNamedParameter(time())),
                     ),
                 )
             )
             ->orderBy('change_status', 'desc')
             ->addOrderBy('created', 'desc');
 
-        $qb->setFirstResult($page * $nbItems);
-        $qb->setMaxResults($nbItems);
+        $queryBuilder->setFirstResult($page * $nbItems);
+        $queryBuilder->setMaxResults($nbItems);
 
-        return $this->findEntities($qb);
+        return $this->findEntities($queryBuilder);
     }
 
     public function findJob()
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select('*')
+        $queryBuilder->select('reserved_at', 'last_run')
             ->from('jobs')
-            ->where($qb->expr()->like('class', $qb->createNamedParameter(
-                '%' . $this->db->escapeLikeParameter('\YumiSignNxtC\\') . '%'
-                // '%\\YumiSignNxtC\\%'
-            )));
+            // ->where($queryBuilder->expr()->like('class', $queryBuilder->createNamedParameter(
+            //     '%' . $this->db->escapeLikeParameter('\YumiSignNxtC\\') . '%'
+            // )));
+            ->where($queryBuilder->expr()->eq('class', $queryBuilder->createNamedParameter('OCA\YumiSignNxtC\Cron\CheckAsyncSignatureTask')));
 
-        $cursor = $qb->executeQuery();
+        $cursor = $queryBuilder->executeQuery();
         $ymsJob = $cursor->fetch();
+        if (!$ymsJob) { // Not row in database => not an error, the cron just has never run
+            $ymsJob = [
+                'reserved_at'   => 0,
+                'last_run'      => 0,
+            ];
+        }
         $cursor->closeCursor();
 
         return $ymsJob;
     }
 
-    public function findPendingsByApplicant(string $applicantId, int $page = 0, int $nbItems = 20)
+    public function findAll(int $page = -1, int $nbItems = -1): array
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select('id', 'applicant_id', 'file_path', 'workspace_id', 'workflow_id', 'workflow_name', 'envelope_id', 'status', 'expiry_date', 'created', 'change_status', 'recipient', 'global_status', 'msg_date')
+        $queryBuilder->select('id', 'applicant_id', 'file_path', 'workspace_id', 'workflow_id', 'workflow_name', 'envelope_id', 'status', 'expiry_date', 'created', 'change_status', 'recipient', 'global_status', 'msg_date', 'file_id')
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('applicant_id', $qb->createNamedParameter($applicantId)))
-            ->andWhere(
-                $qb->expr()->orX(
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_APPROVED)),
-                    $qb->expr()->eq('global_status', $qb->createNamedParameter(YMS_STATUS_STARTED)),
-                )
-            )
             ->orderBy('change_status', 'desc')
             ->addOrderBy('created', 'desc');
 
-        $qb->setFirstResult($page * $nbItems);
-        $qb->setMaxResults($nbItems);
+        if ($page !== -1 && $nbItems !== -1) {
+            $queryBuilder->setFirstResult($page * $nbItems);
+            $queryBuilder->setMaxResults($nbItems);
+        }
 
-        return $this->findEntities($qb);
+        return $this->findEntities($queryBuilder);
+    }
+
+    public function findAllEnvelopesIds(int $rightNow, string $applicantId = null, int $page = -1, int $nbItems = -1): array
+    {
+        $queryBuilder = $this->db->getQueryBuilder();
+
+        $queryBuilder->select('applicant_id', 'envelope_id')
+            ->from($this->getTableName(), $this->tableAlias)
+            // Add order by to display on WebUI
+            ->orderBy('change_status', 'desc')
+            ->addOrderBy('created', 'desc')
+            ->where('1 = 1'); // Permits to use functions with andWhere conditions
+
+        // Junctions
+        $this->joinActivity($queryBuilder);
+
+        // Add more filters to prevent huge data
+        $this->whereApplicantIfExists($applicantId, $queryBuilder);
+        $this->whereLastActivity($rightNow, $queryBuilder);
+        $this->whereGlobalStatusActive($queryBuilder);
+        $this->whereExpiryDate($rightNow, $queryBuilder);
+        $this->whereChangeStatus($rightNow, $queryBuilder);
+
+        // Set pages
+        if ($page !== -1 && $nbItems !== -1) {
+            $queryBuilder->setFirstResult($page * $nbItems);
+            $queryBuilder->setMaxResults($nbItems);
+        }
+
+        return $this->findEntities($queryBuilder);
+    }
+
+    public function findAllActiveEnvelopesIds(string $applicantId = null, int $limit = null)
+    {
+        $queryBuilder = $this->db->getQueryBuilder();
+
+        $queryBuilder->select('id', 'applicant_id', 'file_path', 'workspace_id', 'envelope_id')
+            ->from($this->getTableName())
+            ->setMaxResults($limit)
+            ->orderBy('change_status', 'desc')
+            ->addOrderBy('created', 'desc')
+            ->where(
+                $queryBuilder->expr()->neq('global_status', $queryBuilder->createNamedParameter(Constante::get(Cst::YMS_ARCHIVED)))
+            )
+            ->andWhere($queryBuilder->expr()->neq('global_status', $queryBuilder->createNamedParameter(Constante::status(Status::NOT_APPLICABLE))));
+
+        if (!is_null($applicantId)) {
+            $queryBuilder->andWhere($queryBuilder->expr()->eq('applicant_id', $queryBuilder->createNamedParameter($applicantId)));
+        }
+
+        return $this->findEntities($queryBuilder);
+    }
+
+    public function findPendingsByApplicant(int $rightNow, string $applicantId, int $page = 0, int $nbItems = 20)
+    {
+        $queryBuilder = $this->db->getQueryBuilder();
+
+        $queryBuilder->select('id', 'applicant_id', 'file_path', 'workspace_id', 'workflow_id', 'workflow_name', 'envelope_id', 'status', 'expiry_date', 'created', 'change_status', 'recipient', 'global_status', 'msg_date', 'file_id')
+            ->from($this->getTableName(), $this->tableAlias)
+            // Add order by to display on WebUI
+            ->orderBy('change_status', 'desc')
+            ->addOrderBy('created', 'desc')
+            ->where('1 = 1'); // Permits to use functions with andWhere conditions
+
+        // Add more filters
+        $this->whereApplicantIfExists($applicantId, $queryBuilder);
+        $this->whereGlobalStatusPending($queryBuilder);
+        $this->whereExpiryDate($rightNow, $queryBuilder);
+
+        $queryBuilder->setFirstResult($page * $nbItems);
+        $queryBuilder->setMaxResults($nbItems);
+
+        return $this->findEntities($queryBuilder);
     }
 
     public function findRecipientTransaction(string $envelopeId, string $recipient)
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select('*')
+        $queryBuilder->select('*')
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('envelope_id',  $qb->createNamedParameter($envelopeId)))
-            ->andWhere($qb->expr()->eq('recipient', $qb->createNamedParameter($recipient)));
+            ->where($queryBuilder->expr()->eq('envelope_id',  $queryBuilder->createNamedParameter($envelopeId)))
+            ->andWhere($queryBuilder->expr()->eq('recipient', $queryBuilder->createNamedParameter($recipient)));
 
-        return $this->findEntity($qb);
+        return $this->findEntity($queryBuilder);
     }
 
     public function findTransaction(string $envelopeId, string $recipient = '')
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select('*')
+        $queryBuilder->select('*')
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('envelope_id',      $qb->createNamedParameter($envelopeId)))
+            ->where($queryBuilder->expr()->eq('envelope_id',      $queryBuilder->createNamedParameter($envelopeId)))
             ->setMaxResults(1);
 
-        if ($recipient !== '') $qb->andWhere($qb->expr()->eq('recipient', $qb->createNamedParameter($recipient)));
+        if ($recipient !== '') $queryBuilder->andWhere($queryBuilder->expr()->eq('recipient', $queryBuilder->createNamedParameter($recipient)));
 
-        return $this->findEntity($qb);
+        return $this->findEntity($queryBuilder);
     }
 
-    public function findTransactions(string $envelopeId = '')
+    public function findTransactions(string $envelopeId = '', string $applicant = ''): array
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->select('*')
+        $queryBuilder->select('*')
             ->from($this->getTableName());
 
-        if ($envelopeId !== '') $qb->where($qb->expr()->eq('envelope_id', $qb->createNamedParameter($envelopeId)));
+        $whereCommand = 'where';
 
-        return $this->findEntities($qb);
+        if ($envelopeId !== '') {
+            $queryBuilder->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)));
+            $whereCommand = 'andWhere';
+        }
+        if ($applicant !== '') {
+            $queryBuilder->$whereCommand($queryBuilder->expr()->eq('applicant_id', $queryBuilder->createNamedParameter($applicant)));
+        }
+
+        return $this->findEntities($queryBuilder);
     }
 
     public function resetJob()
     {
-        $qb = $this->db->getQueryBuilder();
+        $queryBuilder = $this->db->getQueryBuilder();
 
-        $qb->update('jobs')
-            ->set('reserved_at', $qb->createParameter('reserved_at'))
+        $queryBuilder->update('jobs')
+            ->set('reserved_at', $queryBuilder->createParameter('reserved_at'))
             ->setParameter('reserved_at', 0)
-            ->where($qb->expr()->like('class', $qb->createNamedParameter(
+            ->where($queryBuilder->expr()->like('class', $queryBuilder->createNamedParameter(
                 '%' . $this->db->escapeLikeParameter('\YumiSignNxtC\\') . '%'
                 // '%\\YumiSignNxtC\\%'
             )));
 
-        $qb->executeStatement();
+        $queryBuilder->executeStatement();
+    }
+
+    /**
+     * UPDATES
+     */
+    public function updateTransactionAllStatuses(string $envelopeId, string $newStatus)
+    {
+        try {
+            $queryBuilder = $this->db->getQueryBuilder();
+            $queryBuilder->update('yumisign_nxtc_sess')
+                ->set('global_status', $queryBuilder->createParameter('global_status'))
+                ->setParameter('global_status', $newStatus)
+                ->set('status', $queryBuilder->createParameter('status'))
+                ->setParameter('status', $newStatus)
+                ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)));
+            $queryBuilder->executeStatement();
+        } catch (\Throwable $th) {
+            throw $th;
+        }
+    }
+
+    public function updateTransactionStatus(string $envelopeId, string $newStatus)
+    {
+        $queryBuilder = $this->db->getQueryBuilder();
+        $queryBuilder->update('yumisign_nxtc_sess')
+            ->set('status', $queryBuilder->createParameter('status'))
+            ->setParameter('status', $newStatus)
+            ->where($queryBuilder->expr()->eq('envelope_id', $queryBuilder->createNamedParameter($envelopeId)));
+        $queryBuilder->executeStatement();
+    }
+
+    public function updateTransactionsStatus(array $transactionsToUpdate): int
+    {
+        $this->db->beginTransaction();
+        $realTransactionUpdated = 0;
+        try {
+            foreach ($transactionsToUpdate as $unitTransactionToUpdate) {
+                $queryBuilder = $this->db->getQueryBuilder();
+                $queryBuilder->update('yumisign_nxtc_sess')
+                    // status
+                    // ->set(Constante::entity(Entity::STATUS), $queryBuilder->createParameter(Constante::entity(Entity::STATUS)))
+                    // ->setParameter(Constante::entity(Entity::STATUS), $unitTransactionToUpdate[Constante::entity(Entity::STATUS)])
+                    // global status
+                    // ->set(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createParameter(Constante::entity(Entity::GLOBAL_STATUS)))
+                    // ->setParameter(Constante::entity(Entity::GLOBAL_STATUS), $unitTransactionToUpdate[Constante::entity(Entity::GLOBAL_STATUS)])
+                    // change_status
+                    ->set(Constante::entity(Entity::CHANGE_STATUS), $queryBuilder->createParameter(Constante::entity(Entity::CHANGE_STATUS)))
+                    ->setParameter(Constante::entity(Entity::CHANGE_STATUS), time())
+
+                    ->where($queryBuilder->expr()->eq(Constante::entity(Entity::ENVELOPE_ID), $queryBuilder->createNamedParameter($unitTransactionToUpdate[Constante::entity(Entity::ENVELOPE_ID)])));
+
+                // Add set parameters
+                $this->setStatusIfExists($unitTransactionToUpdate, $queryBuilder);
+                $this->setGlobalStatusIfExists($unitTransactionToUpdate, $queryBuilder);
+
+
+                // if (!is_null($unitTransactionToUpdate[Constante::entity(Entity::APPLICANT_ID)])) {
+                //     $queryBuilder->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::APPLICANT_ID), $queryBuilder->createNamedParameter($unitTransactionToUpdate[Constante::entity(Entity::APPLICANT_ID)])));
+                // }
+                $this->whereApplicantIfExists(Utility::getIfExists(Constante::entity(Entity::APPLICANT_ID), $unitTransactionToUpdate), $queryBuilder);
+
+                // if (array_key_exists(Constante::entity(Entity::RECIPIENT), $unitTransactionToUpdate)) {
+                //     $queryBuilder->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::RECIPIENT), $queryBuilder->createNamedParameter($unitTransactionToUpdate[Constante::entity(Entity::RECIPIENT)])));
+                // }
+                $this->whereRecipientIfExists(Utility::getIfExists(Constante::entity(Entity::RECIPIENT), $unitTransactionToUpdate), $queryBuilder);
+
+                $queryBuilder->executeStatement();
+                $realTransactionUpdated++;
+            }
+
+            $this->db->commit();
+        } catch (\Throwable $th) {
+            $this->db->rollBack();
+            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__);
+
+            throw $th;
+        }
+
+        return $realTransactionUpdated;
+    }
+
+    public function updateTransactionsStatusExpired(): void
+    {
+        $this->db->beginTransaction();
+        try {
+            $queryBuilder = $this->db->getQueryBuilder();
+            $queryBuilder->update('yumisign_nxtc_sess')
+                // status
+                ->set(Constante::entity(Entity::STATUS), $queryBuilder->createParameter(Constante::entity(Entity::STATUS)))
+                ->setParameter(Constante::entity(Entity::STATUS), Constante::status(Status::EXPIRED))
+                // global status
+                ->set(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createParameter(Constante::entity(Entity::GLOBAL_STATUS)))
+                ->setParameter(Constante::entity(Entity::GLOBAL_STATUS), Constante::status(Status::EXPIRED))
+                // change_status
+                ->set(Constante::entity(Entity::CHANGE_STATUS), $queryBuilder->createParameter(Constante::entity(Entity::CHANGE_STATUS)))
+                ->setParameter(Constante::entity(Entity::CHANGE_STATUS), time())
+
+                ->where($queryBuilder->expr()->lt(Constante::entity(Entity::EXPIRY_DATE), $queryBuilder->createNamedParameter(intval(time()))));
+
+            $queryBuilder->executeStatement();
+
+            $this->db->commit();
+        } catch (\Throwable $th) {
+            $this->db->rollBack();
+            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__);
+
+            throw $th;
+        }
     }
 }

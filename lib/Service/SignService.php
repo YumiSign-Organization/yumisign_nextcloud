@@ -1,9 +1,31 @@
 <?php
 
+/**
+ *
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ *
+ * @license GNU AGPL version 3 or any later version
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 namespace OCA\YumiSignNxtC\Service;
 
 use CURLFile;
 use CurlHandle;
+use CURLStringFile;
 use DateInterval;
 use DateTime;
 use Exception;
@@ -25,23 +47,27 @@ use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\Notification\IManager;
+use OC\Files\Filesystem;
+use OC\Files\Mount\Manager;
+use OC\Files\Node\Folder;
+use OC\Files\Mount\MountPoint;
+use OCP\IDateTimeFormatter;
+use OCP\L10N\IFactory;
 
+use function OCP\Log\logger;
+use OCA\YumiSignNxtC\Service\Constante;
+use OCA\YumiSignNxtC\Service\Cst;
+use OCA\YumiSignNxtC\Service\Entity;
+use OCP\Files\File;
+use OCP\IUserSession;
 use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 
 class SignService
 {
-    use GetsFile;
+    // use GetsFile;
 
     const CNX_TIME_OUT = 3;
-
-    /** @var IL10N */
-    private $l;
-
-    private SignSessionMapper $mapper;
-    private $storage;
-    private $accountManager;
-    private $userManager;
 
     // Settings
     private $apiKey;
@@ -57,7 +83,7 @@ class SignService
     private $signedFile;
     private $signScope;
     private $syncTimeout;
-    private $temporaryFolder;
+    // private $temporaryFolder;
     private $useProxy;
     private $userSettings;
     private $watermarkText;
@@ -67,30 +93,23 @@ class SignService
      * This priority status array is used to prevent network delays to override most recent status (workflow logic)
      * e.g. "signed" is after "approved" but if "Approved message" is received after "Signed message", the "approved" status will erase the final "signed" status
      */
-    private $statusPriority = [
-        YMS_STATUS_NOT_STARTED      => 0,
-        YMS_STATUS_STARTED          => 1,
-        YMS_STATUS_APPROVED         => 2,
-        YMS_STATUS_DECLINED         => 3,
-        YMS_STATUS_CANCELED         => 4,
-        YMS_STATUS_EXPIRED          => 5,
-        YMS_STATUS_TO_BE_ARCHIVED   => 6,
-        YMS_STATUS_SIGNED           => 7,
-    ];
+    // private $statusPriority;
 
     public function __construct(
-        IRootFolder $storage,
-        IConfig $config,
-        IUserManager $userManager,
-        IAccountManager $accountManager,
-        SignSessionMapper $mapper,
-        IL10N $l
+        private IAccountManager $accountManager,
+        private IUserSession $userSession,
+        private IConfig $config,
+        private IL10N $l,
+        private IRootFolder $rootFolder,
+        private IUserManager $userManager,
+        private SignSessionMapper $mapper,
+        private IFactory $l10nFactory,
+        private IConfig $systemConfig,
+        private IL10N $l10n,
+        private IDateTimeFormatter $formatter,
+        private LogYumiSign $logYumiSign,
     ) {
-        $this->mapper = $mapper;
-        $this->storage = $storage;
-        $this->accountManager = $accountManager;
-        $this->userManager = $userManager;
-        $this->l = $l;
+
         Utility::$l = $l;
 
         $this->apiKey           = $config->getAppValue(YumiSignApp::APP_ID, 'api_key');
@@ -106,7 +125,7 @@ class SignService
         $this->signedFile       = $config->getAppValue(YumiSignApp::APP_ID, 'signed_file');
         $this->signScope        = $config->getAppValue(YumiSignApp::APP_ID, 'sign_scope', 'qualified');
         $this->syncTimeout      = (int) $config->getAppValue(YumiSignApp::APP_ID, 'sync_timeout') * 60;
-        $this->temporaryFolder  = rtrim($config->getSystemValue('tempdirectory', rtrim(sys_get_temp_dir(), '/') . '/nextcloudtemp', '/')) . '/';
+        // $this->temporaryFolder  = rtrim($config->getSystemValue('tempdirectory', rtrim(sys_get_temp_dir(), '/') . '/nextcloudtemp', '/')) . '/';
         $this->useProxy         = $config->getAppValue(YumiSignApp::APP_ID, 'use_proxy');
         $this->userSettings     = $config->getAppValue(YumiSignApp::APP_ID, 'user_settings');
         $this->watermarkText    = $config->getAppValue(YumiSignApp::APP_ID, 'watermark_text');
@@ -172,7 +191,7 @@ class SignService
     private function analyseYumiSignResponse($response, bool $subArray = false): array
     {
         $processPrefix = sprintf("%s/%s/%s", basename(__FILE__, '.php'), __FUNCTION__, "Analyse YumiSign response");
-        LogYumiSign::write((is_array($response) ? json_encode($response) : $response), __FUNCTION__);
+        $this->logYumiSign->debug((is_array($response) ? json_encode($response) : $response), __FUNCTION__);
 
         $return = [];
 
@@ -183,19 +202,19 @@ class SignService
 
         // Check if this array response is simple or multidimensional
         switch (true) {
-            case $subArray && !(array_key_exists(YMS_IDENTIFIER, $response) &&
-                array_key_exists(YMS_RESULT, $response) &&
-                array_key_exists(YMS_RESPONSE, $response) &&
-                array_key_exists(YMS_ERROR, $response)
+            case $subArray && !(array_key_exists(Constante::get(Cst::YMS_IDENTIFIER), $response) &&
+                array_key_exists(Constante::get(Cst::YMS_RESULT), $response) &&
+                array_key_exists(Constante::get(Cst::YMS_RESPONSE), $response) &&
+                array_key_exists(Constante::get(Cst::ERROR), $response)
             ):
                 // Throw an exception because the YumiSign response structure is abnormal
                 throw new Exception($this->l->t("YumiSign response is invalid; process: \"{$processPrefix}\""), false);
                 break;
 
-            case !$subArray && !(array_key_exists(YMS_IDENTIFIER, $response) &&
-                array_key_exists(YMS_RESULT, $response) &&
-                array_key_exists(YMS_RESPONSE, $response) &&
-                array_key_exists(YMS_ERROR, $response)
+            case !$subArray && !(array_key_exists(Constante::get(Cst::YMS_IDENTIFIER), $response) &&
+                array_key_exists(Constante::get(Cst::YMS_RESULT), $response) &&
+                array_key_exists(Constante::get(Cst::YMS_RESPONSE), $response) &&
+                array_key_exists(Constante::get(Cst::ERROR), $response)
             ):
                 // Multidimensional array
                 foreach ($response as $key => $item) {
@@ -203,25 +222,25 @@ class SignService
                 }
                 break;
 
-            case (array_key_exists(YMS_IDENTIFIER, $response) &&
-                array_key_exists(YMS_RESULT, $response) &&
-                array_key_exists(YMS_RESPONSE, $response) &&
-                array_key_exists(YMS_ERROR, $response)):
+            case (array_key_exists(Constante::get(Cst::YMS_IDENTIFIER), $response) &&
+                array_key_exists(Constante::get(Cst::YMS_RESULT), $response) &&
+                array_key_exists(Constante::get(Cst::YMS_RESPONSE), $response) &&
+                array_key_exists(Constante::get(Cst::ERROR), $response)):
                 // Simple array
                 // YumiSign returns error or bad result
                 // WARNING: this is not an exception but a Business Logic valid response
-                if ($response[YMS_ERROR] == true) {
-                    $return['code']    = $response[YMS_ERROR]['code'];
-                    $return['message'] = $response[YMS_ERROR]['message'];
+                if ($response[Constante::get(Cst::ERROR)] == true) {
+                    $return[Constante::get(Cst::CODE)]    = $response[Constante::get(Cst::ERROR)][Constante::get(Cst::CODE)];
+                    $return['message'] = $response[Constante::get(Cst::ERROR)]['message'];
                     break;
                 }
                 // Just in case error intel not filled and result is wrong...
-                if ($response[YMS_RESULT] == false) {
-                    $return['code']    = false;
+                if ($response[Constante::get(Cst::YMS_RESULT)] == false) {
+                    $return[Constante::get(Cst::CODE)]    = false;
                     $return['message'] = "Error occurred during process";
                 }
                 // Here, the response is OK
-                $return['code'] = true;
+                $return[Constante::get(Cst::CODE)] = true;
                 $return['message'] = "OK";
                 break;
 
@@ -233,28 +252,30 @@ class SignService
         return $return;
     }
 
-    public function asyncExternalMobileSignPrepare($path, $email, $userId, $appUrl, $signatureType)
+    public function asyncExternalMobileSignPrepare($path, $email, $userId, $appUrl, $signatureType, $fileId)
     {
         $resp = [];
 
-        // list($fileContent, $fileName, $fileSize, $lastModified) = $this->getFile($path, $userId);
+        logger('yumisign_nextcloud')->debug('fileId : ' . json_encode($fileId));
 
-        $user = $this->userManager->get($userId);
-        $account = $this->accountManager->getAccount($user);
-        $sender = $account->getProperty(IAccountManager::PROPERTY_DISPLAYNAME)->getValue();
+        // $user = $this->userManager->get($userId);
+        $user = $this->userSession->getUser();
 
         // Get current document full path (filesystem)
-        $currentUserFolder = $this->storage->getUserFolder($userId);
-        $config = new \OC\Config('config/');
-        $base_path = $config->getValue('datadirectory');
+        $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+
+        $fileNode = $userFolder->getById($fileId)[0];
+        $filePath = $fileNode->getInternalPath();
+
+        logger('yumisign_nextcloud')->debug('$filePath : ' . $filePath);
 
         // Create a workflow
         $expiryDate = strtotime("+{$this->asyncTimeout} days");
-        $curlWorkflow = $this->createWorkflow($this->serverUrl, $this->apiKey, $this->workspaceId, $userId, $base_path . $currentUserFolder->getPath() . DIRECTORY_SEPARATOR, $path, strtolower($signatureType), $expiryDate);
+        $curlWorkflow = $this->createWorkflow($this->serverUrl, $this->apiKey, $this->workspaceId, $userId, $fileNode, strtolower($signatureType), $expiryDate);
         $workflow = json_decode($curlWorkflow->body);
 
         // Initialize workflow preferences
-        $uniquePreference = ["name" => "WorkflowNotificationCallbackUrlPreference", "value" => "{$appUrl}/webhook"];
+        $uniquePreference = ["name" => "WorkflowNotificationCallbackUrlPreference", "value" => "{$appUrl}"];
         $preferences["preferences"][] = $uniquePreference;
 
         // Add workflow preferences
@@ -264,7 +285,7 @@ class SignService
         $secret = "";
         $bodyWorkflowPreferences = json_decode($curlWorkflowPreferences->body);
         foreach ($bodyWorkflowPreferences as $key => $subArray) {
-            if ($subArray->name && strcasecmp($subArray->name, YMS_WF_SECRET)  === 0) {
+            if ($subArray->name && strcasecmp($subArray->name, Constante::get(Cst::YMS_WF_SECRET))  === 0) {
                 $secret = $subArray->value;
                 break;
             }
@@ -304,7 +325,7 @@ class SignService
             // Insert row in DB
             $signSession = new SignSession();
             $signSession->setApplicantId($userId);
-            $signSession->setFilePath($path);
+            $signSession->setFilePath($filePath);
             $signSession->setWorkspaceId($this->workspaceId);
             $signSession->setWorkflowId($workflow->id);
             $signSession->setWorkflowName($workflow->name);
@@ -317,6 +338,7 @@ class SignService
             $signSession->setRecipient($dbwRecipients->email);
             $signSession->setGlobalStatus($debriefWorkflow->status);
             $signSession->setMsgDate($debriefWorkflow->createDate);
+            $signSession->setFileId($fileId);
 
             $this->mapper->insert($signSession);
         }
@@ -340,7 +362,7 @@ class SignService
         // Add code field
         if (!empty($session->session) && !empty($session->designerUrl)) {
             $resp = json_decode(json_encode($session), true);
-            $resp['code'] = '2';
+            $resp[Constante::get(Cst::CODE)] = '2';
             $resp["error"] = "";
             $resp["message"] = "OpenDesigner";
             $resp["workspaceId"] = $this->workspaceId;
@@ -377,7 +399,7 @@ class SignService
             // Update status in DB
             $yumisignSessions = $this->mapper->findTransactions($envelopeId);
             foreach ($yumisignSessions as $yumisignSession) {
-                $yumisignSession->setStatus(YMS_STARTED);
+                $yumisignSession->setStatus(Constante::status(Status::STARTED));
                 $yumisignSession->setChangeStatus(time());
                 $this->mapper->update($yumisignSession);
             }
@@ -394,7 +416,7 @@ class SignService
             try {
                 $signSession = $this->mapper->findActiveTransaction($envelopeId, $recipient);
             } catch (DoesNotExistException $e) {
-                $resp['code'] = 0;
+                $resp[Constante::get(Cst::CODE)] = 0;
                 $resp['message'] = $this->l->t("YumiSign transaction not started or timedout");
                 return $resp;
             }
@@ -402,14 +424,14 @@ class SignService
             try {
                 $signSession = $this->mapper->findTransaction($envelopeId, $recipient);
             } catch (DoesNotExistException $e) {
-                $resp['code'] = 0;
+                $resp[Constante::get(Cst::CODE)] = 0;
                 $resp['message'] = $this->l->t("YumiSign transaction not found");
                 return $resp;
             }
         }
 
         if ($signSession->getApplicantId() !== $userId) {
-            $resp['code'] = 403;
+            $resp[Constante::get(Cst::CODE)] = 403;
             $resp['message'] = $this->l->t("YumiSign transaction not found for this user");
             return $resp;
         }
@@ -418,14 +440,14 @@ class SignService
             // Check on YumiSign only if not "Forcing process"
             // First, check the real state of this YumiSign transaction
             $check = json_decode($this->debriefWorkflow($this->serverUrl, $this->apiKey, $signSession->getWorkspaceId(), $signSession->getWorkflowId())->body, true);
-            if (strcasecmp($check[YMS_STATUS], YMS_STATUS_CANCELED) !== 0) {
+            if (strcasecmp($check[Constante::get(Cst::YMS_STATUS)], Constante::status(Status::CANCELED)) !== 0) {
                 $resp = $this->cancelWorkflow($this->serverUrl, $this->apiKey, $signSession->getWorkspaceId(), $signSession->getWorkflowId());
             } else {
                 // Transaction already cancelled on YUmiSign server, not on DB (weird...)
-                $resp['code'] = true;
-                $resp['message'] = YMS_ALREADY_CANCELLED;
+                $resp[Constante::get(Cst::CODE)] = true;
+                $resp['message'] = Constante::get(Cst::YMS_ALREADY_CANCELLED);
                 // Update DB status to match with YUmiSign server
-                $this->updateAllStatus($envelopeId, YMS_STATUS_CANCELED, time());
+                $this->updateAllStatus($envelopeId, Constante::status(Status::CANCELED), time());
             }
             // Delete DB Issue Request if "Forcing process"
             if ($forceDeletion) {
@@ -437,11 +459,11 @@ class SignService
                     $this->deleteWorkflow($this->serverUrl, $this->apiKey, json_encode($workflows));
                 }
 
-                $resp['code'] = true;
-                $resp['message'] = YMS_DELETED;
+                $resp[Constante::get(Cst::CODE)] = true;
+                $resp['message'] = Constante::get(Cst::YMS_DELETED);
             }
         } catch (\Throwable $th) {
-            $resp['code']    = $th->getCode();
+            $resp[Constante::get(Cst::CODE)]    = $th->getCode();
             $resp['message'] = $th->getMessage();
             return $resp;
         }
@@ -465,7 +487,7 @@ class SignService
 
             curl_close($ch);
 
-            LogYumiSign::write(json_encode($curlResponse), __FUNCTION__);
+            $this->logYumiSign->debug(json_encode($curlResponse), __FUNCTION__);
             // Check result validity
             $return = $this->checkResultValidity($curlResponse, __FUNCTION__);
         } catch (\Throwable $th) {
@@ -478,7 +500,7 @@ class SignService
 
     public function checkAsyncSignature()
     {
-        LogYumiSign::write("checkAsyncSignature : starting process", __FUNCTION__);
+        $this->logYumiSign->info("checkAsyncSignature : starting process", __FUNCTION__);
 
         $curlResponse = new CurlResponse();
         try {
@@ -504,15 +526,15 @@ class SignService
                         !empty(Utility::getArrayData($item, 'status', false))
                     ) {
                         // Ignore transactions which have to be archived
-                        if (strcasecmp($item['status'], YMS_STATUS_TO_BE_ARCHIVED) !== 0) {
+                        if (strcasecmp($item['status'], Constante::status(Status::TO_BE_ARCHIVED)) !== 0) {
                             // If database does not contain the envelope ID, delete YumiSign transaction on server
                             if ($this->mapper->countTransactionsByEnvelopeId($item['envelopeId']) == 0) {
-                                LogYumiSign::write(sprintf("This transaction %s (%s) is missing in DB; should delete it. Status is %s", $item['envelopeId'], $item['name'], $item['status']), __FUNCTION__);
+                                $this->logYumiSign->info(sprintf("This transaction %s (%s) is missing in DB; should delete it. Status is %s", $item['envelopeId'], $item['name'], $item['status']), __FUNCTION__);
                                 $workflows = [];
                                 $workflows['workflows'][] = ['id' => $item['id'], 'workspaceId' => $this->workspaceId];
 
                                 // Check if status is cancelled; if not, cancel YumiSign transaction before deletion
-                                if (strcasecmp($item['status'], YMS_STATUS_CANCELED) !== 0) {
+                                if (strcasecmp($item['status'], Constante::status(Status::CANCELED)) !== 0) {
                                     $this->cancelWorkflow($this->serverUrl, $this->apiKey, $this->workspaceId, $item['id']);
                                 }
                                 $this->deleteWorkflow($this->serverUrl, $this->apiKey, json_encode($workflows));
@@ -543,7 +565,7 @@ class SignService
                 $yumisignSessions = $this->mapper->findTransactions();
                 foreach ($yumisignSessions as $yumisignSession) {
                     if (!array_key_exists($yumisignSession->getEnvelopeId(), $envelopesYumiSign)) {
-                        LogYumiSign::write("Delete DB {$yumisignSession->getEnvelopeId()}", __FUNCTION__);
+                        $this->logYumiSign->info("Delete DB {$yumisignSession->getEnvelopeId()}", __FUNCTION__);
                         $this->mapper->deleteTransactions($yumisignSession->getEnvelopeId());
                     }
                 }
@@ -553,26 +575,26 @@ class SignService
             }
         } catch (\Throwable $th) {
             $curlResponse = new CurlResponse();
-            LogYumiSign::write(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__);
+            $this->logYumiSign->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__);
         }
-        LogYumiSign::write("checkAsyncSignature : well done", __FUNCTION__);
+        $this->logYumiSign->info("checkAsyncSignature : well done", __FUNCTION__);
 
         return $curlResponse;
     }
 
-    private function checkCurlBody(CurlResponse $curlResponse, string $functionName)
+    public function checkCurlBody(CurlResponse $curlResponse, string $functionName)
     {
         if (null === json_decode($curlResponse->body)) {
             $message = sprintf("cURL returned empty body in process \"%s\".", $functionName);
-            LogYumiSign::write($message, __FUNCTION__, true);
+            $this->logYumiSign->debug($message, __FUNCTION__, true);
         }
     }
 
-    private function checkCurlCode(CurlResponse $curlResponse, string $functionName)
+    public function checkCurlCode(CurlResponse $curlResponse, string $functionName)
     {
         if (($curlResponse->code !== 200) && ($curlResponse->code !== 302)) {
             $message = sprintf("cURL returned unwanted code (%s). This process is skipped for function %s.", $curlResponse->code, $functionName);
-            LogYumiSign::write($message, __FUNCTION__, true);
+            $this->logYumiSign->debug($message, __FUNCTION__, true);
         }
     }
 
@@ -583,14 +605,53 @@ class SignService
 
         if (($curlResponse->code !== 200) && ($curlResponse->code !== 302)) {
             $message = sprintf("cURL returned unwanted code (%s). This process is skipped for function %s.", $curlResponse->code, $functionName);
-            LogYumiSign::write($message, __FUNCTION__);
-            $return['code']    = false;
+            $this->logYumiSign->debug($message, __FUNCTION__);
+            $return[Constante::get(Cst::CODE)]    = false;
             $return['message'] = $message;
             return $return;
         }
 
         if (null === json_decode($curlResponse->body)) throw new Exception($this->l->t("Critical error during process : \"{$processPrefix}\""), 1);
         return $this->analyseYumiSignResponse($curlResponse->body);
+    }
+
+    // Get the YumiSign server url status (OK/KO) for the Settings page
+    public function checkSettings()
+    {
+        $return = [];
+
+        try {
+            // Retrieve connection intel from database
+            $apiKey      = $this->config->getAppValue('yumisign_nextcloud', 'api_key');
+            $serverUrl   = $this->config->getAppValue('yumisign_nextcloud', 'server_url');
+            $workspaceId = $this->config->getAppValue('yumisign_nextcloud', 'workspace_id');
+
+            // Call the server with the stored parameters
+            $ch = $this->setCurlEnv($apiKey, "{$serverUrl}/workspaces/{$workspaceId}", "GET", false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            // Call YMS server
+            $curlResponse = $this->getCurlResponse($ch);
+            curl_close($ch);
+
+            // Check response validity
+            $this->checkCurlCode($curlResponse, __FUNCTION__);
+            $this->checkCurlBody($curlResponse, __FUNCTION__);
+
+            // At this point, this response is OK
+            $return[Constante::get(Cst::YMS_ID)] = $workspaceId;
+            $return[Constante::get(Cst::CODE)] = $return[Constante::get(Cst::YMS_STATUS)] = true;
+            $return[Constante::get(Cst::YMS_NAME)] = $return[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t("Connected to YumiSign");
+        } catch (\Throwable $th) {
+            $this->logYumiSign->error($th->getMessage(), __FUNCTION__);
+            $this->logYumiSign->error(json_encode($curlResponse), __FUNCTION__);
+            $return = [];
+            $return[Constante::get(Cst::YMS_ID)] = 0;
+            $return[Constante::get(Cst::CODE)] = $return[Constante::get(Cst::YMS_STATUS)]  = false;
+            $return[Constante::get(Cst::YMS_MESSAGE)] = $th->getMessage();
+        }
+
+        return $return;
     }
 
     // Get the YumiSign server url status (OK/KO) for the Settings page
@@ -617,16 +678,16 @@ class SignService
             $this->checkCurlBody($curlResponse, __FUNCTION__);
 
             // At this point, this response is OK
-            $return[YMS_ID] = $workspaceId;
-            $return[YMS_CODE] = $return[YMS_STATUS] = true;
-            $return[YMS_NAME] = $return[YMS_MESSAGE] = $this->l->t("Connected to YumiSign");
+            $return[Constante::get(Cst::YMS_ID)] = $workspaceId;
+            $return[Constante::get(Cst::CODE)] = $return[Constante::get(Cst::YMS_STATUS)] = true;
+            $return[Constante::get(Cst::YMS_NAME)] = $return[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t("Connected to YumiSign");
         } catch (\Throwable $th) {
-            LogYumiSign::write($th->getMessage(), __FUNCTION__);
-            LogYumiSign::write(json_encode($curlResponse), __FUNCTION__);
+            $this->logYumiSign->error($th->getMessage(), __FUNCTION__);
+            $this->logYumiSign->error(json_encode($curlResponse), __FUNCTION__);
             $return = [];
-            $return[YMS_ID] = 0;
-            $return[YMS_CODE] = $return[YMS_STATUS]  = false;
-            $return[YMS_MESSAGE] = $th->getMessage();
+            $return[Constante::get(Cst::YMS_ID)] = 0;
+            $return[Constante::get(Cst::CODE)] = $return[Constante::get(Cst::YMS_STATUS)]  = false;
+            $return[Constante::get(Cst::YMS_MESSAGE)] = $th->getMessage();
         }
 
         return $return;
@@ -635,18 +696,18 @@ class SignService
     public function checkWspCommon(array $workspace, string $wksName, string $wksId)
     {
         if (strcasecmp($wksId, '') === 0) {
-            return (strcasecmp(Utility::getArrayData($workspace, YMS_NAME, true, true), $wksName) === 0);
+            return (strcasecmp(Utility::getArrayData($workspace, Constante::get(Cst::YMS_NAME), true, true), $wksName) === 0);
         } else {
-            return (strcasecmp(Utility::getArrayData($workspace, YMS_NAME, true, true), $wksName) === 0 &&
-                Utility::getArrayData($workspace, YMS_ID, true, true) === intval($wksId));
+            return (strcasecmp(Utility::getArrayData($workspace, Constante::get(Cst::YMS_NAME), true, true), $wksName) === 0 &&
+                Utility::getArrayData($workspace, Constante::get(Cst::YMS_ID), true, true) === intval($wksId));
         }
     }
 
     public function checkWorkspace(IRequest $request)
     {
         $return = [];
-        $return[YMS_LIST_ID] = [];
-        $return[YMS_ID] = '';
+        $return[Constante::get(Cst::YMS_LIST_ID)] = [];
+        $return[Constante::get(Cst::YMS_ID)] = '';
 
         try {
             // Get workspace name from parameters
@@ -673,54 +734,58 @@ class SignService
                 ) {
                     // Common behaviour based on Name value
                     $found = true;
-                    $return[YMS_CODE] = $return[YMS_STATUS] = true;
-                    $return[YMS_NAME] = $return[YMS_MESSAGE] = Utility::getArrayData($workspace, YMS_NAME, true, true);
+                    $return[Constante::get(Cst::CODE)] = $return[Constante::get(Cst::YMS_STATUS)] = true;
+                    $return[Constante::get(Cst::YMS_NAME)] = $return[Constante::get(Cst::YMS_MESSAGE)] = Utility::getArrayData($workspace, Constante::get(Cst::YMS_NAME), true, true);
 
                     // According to the ID value
                     if (strcasecmp($wksId, '') !== 0) {
                         // Name & ID are filled => found this pair
-                        $return[YMS_ID]   = Utility::getArrayData($workspace, YMS_ID, true, true);
+                        $return[Constante::get(Cst::YMS_ID)]   = Utility::getArrayData($workspace, Constante::get(Cst::YMS_ID), true, true);
                         break;
                     } else {
                         // Just a valid Name but maybe several exist => add to the IDs list
-                        $return[YMS_LIST_ID][] = Utility::getArrayData($workspace, YMS_ID, true, true);
+                        $return[Constante::get(Cst::YMS_LIST_ID)][] = Utility::getArrayData($workspace, Constante::get(Cst::YMS_ID), true, true);
                     }
                 }
             }
 
             // If only one ID is found, convert IDs list to unique ID
-            if (sizeof($return[YMS_LIST_ID]) === 1) {
-                $return[YMS_ID] = $return[YMS_LIST_ID][0];
+            if (sizeof($return[Constante::get(Cst::YMS_LIST_ID)]) === 1) {
+                $return[Constante::get(Cst::YMS_ID)] = $return[Constante::get(Cst::YMS_LIST_ID)][0];
             }
 
-            if (!$found) LogYumiSign::write(sprintf($this->l->t("The workspace named \"%s\" was not found on YumiSign server"), $wksName), __FUNCTION__);
+            if (!$found) $this->logYumiSign->info(sprintf($this->l->t("The workspace named \"%s\" was not found on YumiSign server"), $wksName), __FUNCTION__);
         } catch (\Throwable $th) {
-            LogYumiSign::write($th->getMessage(), __FUNCTION__);
-            LogYumiSign::write(json_encode($curlResponse), __FUNCTION__);
+            $this->logYumiSign->error($th->getMessage(), __FUNCTION__);
+            $this->logYumiSign->error(json_encode($curlResponse), __FUNCTION__);
             $return = [];
-            $return[YMS_ID] = '';
-            $return[YMS_LIST_ID] = [];
-            $return[YMS_CODE] = $return[YMS_STATUS]  = false;
-            $return[YMS_MESSAGE] = $th->getMessage();
+            $return[Constante::get(Cst::YMS_ID)] = '';
+            $return[Constante::get(Cst::YMS_LIST_ID)] = [];
+            $return[Constante::get(Cst::CODE)] = $return[Constante::get(Cst::YMS_STATUS)]  = false;
+            $return[Constante::get(Cst::YMS_MESSAGE)] = $th->getMessage();
         }
 
         return $return;
     }
 
-    private function createWorkflow(string $serverUrl, string $apiKey, int $workspaceId, string $userId, string $userpath, string $filepath, string $signType, int $expiryDate): CurlResponse
+    private function createWorkflow(string $serverUrl, string $apiKey, int $workspaceId, string $userId, File $file, string $signType, int $expiryDate): CurlResponse
     {
         $processPrefix = sprintf("%s/%s/%s", basename(__FILE__, '.php'), __FUNCTION__, "Creating YumiSign workflow");
 
         $curlResponse = new CurlResponse();
 
         try {
-            $wfName = pathinfo($userpath . $filepath, PATHINFO_BASENAME) . ' (' . date('Y-m-d_H:i:s') . ')';
+            $wfName = $file->getName() . ' (' . date('Y-m-d_H:i:s') . ')';
 
             $ch = $this->setCurlEnv($apiKey, "{$serverUrl}/workspaces/{$workspaceId}/workflows", "POST", false);
             curl_setopt($ch, CURLOPT_VERBOSE, true);
             $post = array(
                 'name' => $wfName,
-                'document' => new CURLFILE($userpath . $filepath, mime_content_type($userpath . $filepath)),
+                'document' => new CURLFILE(
+                    'data://application/octet-stream;base64,' . base64_encode($file->getContent()),
+                    mime_content_type($file->getMimeType()),
+                    $file->getName()
+                ),
                 'type' => $signType,
                 'expiryDate' => $expiryDate,
                 'senderName' => $userId,
@@ -789,11 +854,6 @@ class SignService
             $curlResponse = $this->getCurlResponse($ch);
 
             curl_close($ch);
-
-            // Check result validity
-            // if (null === json_decode($curlResponse->body)) throw new Exception($this->l->t("Critical error during process : \"{$processPrefix}\""), 1);
-            // if (isset(json_decode($curlResponse->body)->error))     throw new Exception($this->l->t("Cannot retrieve Workflow ID; process: \"{$processPrefix}\" / code: \"" . json_decode($curlResponse->body)->error->code . "\""), 1);
-            // $return = $this->checkResultValidity($curlResponse);
         } catch (\Throwable $th) {
             throw $th;
         }
@@ -819,9 +879,9 @@ class SignService
             // Check result validity
             $return = $this->checkResultValidity($curlResponse, __FUNCTION__);
         } catch (\Throwable $th) {
-            LogYumiSign::write($th->getMessage(), __FUNCTION__);
-            LogYumiSign::write(sprintf("Variables : %s / %s / %s", $serverUrl, $apiKey, $workflowsJson), __FUNCTION__);
-            LogYumiSign::write(json_encode($curlResponse), __FUNCTION__);
+            $this->logYumiSign->error($th->getMessage(), __FUNCTION__);
+            $this->logYumiSign->error(sprintf("Variables : %s / %s / %s", $serverUrl, $apiKey, $workflowsJson), __FUNCTION__);
+            $this->logYumiSign->error(json_encode($curlResponse), __FUNCTION__);
             $curlResponse = new CurlResponse();
             throw $th;
         }
@@ -829,8 +889,34 @@ class SignService
         return $return;
     }
 
+    private function retrieveEnvelopesIds(string $serverUrl, string $apiKey, array $envelopesIds): CurlResponse
+    {
+        $curlResponse = new CurlResponse();
+
+        try {
+            // Create array parameters
+            $arrayParameters = '';
+            foreach ($envelopesIds as $key => $envelopeIdArray) {
+                $envelopeId = $envelopeIdArray[Constante::get(Cst::YMS_ENVELOPEID)];
+                $arrayParameters .= "&ids[]=$envelopeId";
+            }
+
+            $curlUrl = "{$serverUrl}/envelopes?{$arrayParameters}";
+            $ch = $this->setCurlEnv($apiKey, $curlUrl, "GET", false);
+
+            // Call YMS server
+            $curlResponse = $this->getCurlResponse($ch);
+
+            curl_close($ch);
+        } catch (\Throwable $th) {
+            throw $th;
+        }
+
+        return $curlResponse;
+    }
+
     // Common get response
-    private function getCurlResponse($ch): CurlResponse
+    public function getCurlResponse($ch): CurlResponse
     {
         $curlResponse = new CurlResponse();
 
@@ -867,8 +953,8 @@ class SignService
     {
         $workspaceReturned = [];
         // Init failed values just in case (maybe a forgotten UC...)
-        $workspaceReturned[YMS_CODE]    = false;
-        $workspaceReturned[YMS_MESSAGE] = $this->l->t("Workspace not defined.");
+        $workspaceReturned[Constante::get(Cst::CODE)]    = false;
+        $workspaceReturned[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t("Workspace not defined.");
 
         try {
             if (!empty($this->workspaceId))   throw new Exception($this->l->t("Workspace ID is already defined."), 1);
@@ -882,7 +968,7 @@ class SignService
 
             // Call YMS server
             $curlResponse = $this->getCurlResponse($ch);
-            LogYumiSign::write(json_encode($curlResponse), __FUNCTION__);
+            $this->logYumiSign->debug(json_encode($curlResponse), __FUNCTION__);
 
             curl_close($ch);
 
@@ -890,9 +976,9 @@ class SignService
             foreach (json_decode($curlResponse->body) as $workspace) {
                 if ($workspace->name === $wsName && $workspace->description === $wsDescription) {
                     $found = true;
-                    $workspaceReturned[YMS_CODE] = true;
-                    $workspaceReturned[YMS_ID]   = $workspace->id;
-                    $workspaceReturned[YMS_NAME] = $wsName;
+                    $workspaceReturned[Constante::get(Cst::CODE)] = true;
+                    $workspaceReturned[Constante::get(Cst::YMS_ID)]   = $workspace->id;
+                    $workspaceReturned[Constante::get(Cst::YMS_NAME)] = $wsName;
                     break;
                 }
             }
@@ -902,65 +988,56 @@ class SignService
                 $curlResponse = $this->createWorkspace($serverUrl, $apiKey, $wsName, $wsDescription);
                 if (is_null($curlResponse) || !isset(json_decode($curlResponse->body)->id)) throw new Exception($this->l->t("Cannot retrieve Workspace ID."), 1);
                 $response = json_decode($curlResponse->body, true);
-                $workspaceReturned[YMS_CODE] = true;
-                $workspaceReturned[YMS_ID]   = $response[YMS_ID];
-                $workspaceReturned[YMS_NAME] = $response[YMS_NAME];
+                $workspaceReturned[Constante::get(Cst::CODE)] = true;
+                $workspaceReturned[Constante::get(Cst::YMS_ID)]   = $response[Constante::get(Cst::YMS_ID)];
+                $workspaceReturned[Constante::get(Cst::YMS_NAME)] = $response[Constante::get(Cst::YMS_NAME)];
                 $found = true;
             }
         } catch (\Throwable $th) {
-            LogYumiSign::write(json_encode($curlResponse), __FUNCTION__);
+            $this->logYumiSign->error(json_encode($curlResponse), __FUNCTION__);
             $workspaceReturned = [];
-            $workspaceReturned[YMS_CODE]    = false;
-            $workspaceReturned[YMS_MESSAGE] = $th->getMessage();
+            $workspaceReturned[Constante::get(Cst::CODE)]    = false;
+            $workspaceReturned[Constante::get(Cst::YMS_MESSAGE)] = $th->getMessage();
         }
 
         return $workspaceReturned;
     }
 
-    private function isTakingPriorityOver(string $newStatus, string $oldStatus): bool
-    {
-        return $this->statusPriority[$newStatus] > $this->statusPriority[$oldStatus];
-    }
-
     public function lastJobRun()
     {
         $return = [];
-        $wrong = true;
+        // $processError = true;
 
         try {
             $ymsJob = $this->mapper->findJob();
-            $reservedAt = Utility::getArrayData($ymsJob, 'reserved_at', false, 'Not Reservation column found in query result');
-            $lastRun = Utility::getArrayData($ymsJob, 'last_run', false, 'Not Last Run column found in query result');
+            $reservedAt = Utility::getArrayData($ymsJob, 'reserved_at', false, 'No "Reservation" column found in query result');
+            $lastRun = Utility::getArrayData($ymsJob, 'last_run', false, 'No "Last Run" column found in query result');
 
-            if ($reservedAt !== '' && $reservedAt === 0 && $lastRun !== '') {
-                $return[YMS_CODE] = true;
-                $return[YMS_STATUS]  = YMS_SUCCESS;
-                if ($lastRun !== 0) {
-                    $lastRun = date('Y-m-d_H:i:s', $lastRun);
-                    $return[YMS_MESSAGE] = $this->l->t('The cron job is activated; the last time the job ran was at %s', [$lastRun]);
-                } else {
-                    $return[YMS_MESSAGE] = $this->l->t('The cron job is activated');
-                }
-                // Set the flag
-                $wrong = false;
-            } elseif ($reservedAt !== '' && $reservedAt !== 0 && $lastRun !== '') {
-                $return[YMS_CODE] = false;
-                $return[YMS_STATUS]  = YMS_ERROR;
-                $reservedAt = date('Y-m-d_H:i:s', $reservedAt);
-                $return[YMS_MESSAGE] = $this->l->t('The cron job was disabled at %s', [$reservedAt]);
-                // Set the flag
-                $wrong = false;
-            }
+            switch (true) {
+                case $reservedAt === 0 && $lastRun === 0:
+                    $return[Constante::get(Cst::CODE)] = true;
+                    $return[Constante::get(Cst::YMS_STATUS)]  = Constante::get(Cst::YMS_SUCCESS);
+                    $return[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t('The cron job is activated');
+                    break;
 
-            // In case of error...
-            if ($wrong) {
-                $now = date('Y-m-d_H:i:s');
-                LogYumiSign::write($this->l->t('Checking process failed at %s', [$now]), __FUNCTION__, true);
+                case $reservedAt === 0 && $lastRun !== 0:
+                    // $lastRun = date('Y-m-d_H:i:s', $lastRun);
+                    $return[Constante::get(Cst::CODE)] = true;
+                    $return[Constante::get(Cst::YMS_STATUS)]  = Constante::get(Cst::YMS_SUCCESS);
+                    $return[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t('The cron job is activated; the last time the job ran was at %s', [date('Y-m-d_H:i:s', $lastRun)]);
+                    break;
+
+                default:
+                    $return[Constante::get(Cst::CODE)] = false;
+                    $return[Constante::get(Cst::YMS_STATUS)]  = Constante::get(Cst::ERROR);
+                    $return[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t('The cron job was disabled at %s', [date('Y-m-d_H:i:s', $reservedAt)]);
+                    break;
             }
         } catch (\Throwable $th) {
-            $return[YMS_CODE] = false;
-            $return[YMS_STATUS]  = YMS_ERROR;
-            $return[YMS_MESSAGE] = $th->getMessage();
+            $this->logYumiSign->error($this->l->t('Checking process failed at %s', [date('Y-m-d_H:i:s')]), __FUNCTION__, true);
+            $return[Constante::get(Cst::CODE)] = false;
+            $return[Constante::get(Cst::YMS_STATUS)]  = Constante::get(Cst::ERROR);
+            $return[Constante::get(Cst::YMS_MESSAGE)] = $th->getMessage();
         }
 
         return $return;
@@ -978,105 +1055,131 @@ class SignService
         try {
             $this->mapper->resetJob();
             // No exception => query is OK (does not mean data is updated)
-            $return[YMS_CODE] = true;
-            $return[YMS_STATUS]  = YMS_SUCCESS;
-            $return[YMS_MESSAGE] = $this->l->t('The cron job has been activated at %s', [date('Y-m-d_H:i:s')]);
+            $return[Constante::get(Cst::CODE)] = true;
+            $return[Constante::get(Cst::YMS_STATUS)]  = Constante::get(Cst::YMS_SUCCESS);
+            $return[Constante::get(Cst::YMS_MESSAGE)] = $this->l->t('The cron job has been activated at %s', [date('Y-m-d_H:i:s')]);
         } catch (\Throwable $th) {
-            $return[YMS_CODE] = false;
-            $return[YMS_STATUS]  = YMS_ERROR;
-            $return[YMS_MESSAGE] = $th->getMessage();
+            $return[Constante::get(Cst::CODE)] = false;
+            $return[Constante::get(Cst::YMS_STATUS)]  = Constante::get(Cst::ERROR);
+            $return[Constante::get(Cst::YMS_MESSAGE)] = $th->getMessage();
         }
 
         return $return;
     }
 
-    public function saveTransactionFiles(array $requestBody)
+    public function saveTransactionFiles(array $requestBody, string $userId)
     {
         try {
-            foreach ($requestBody['documents'] as $key => $document) {
-                if (array_key_exists('file', $document) && array_key_exists('file', $document['file'])) {
-                    $envelopeId = Utility::getArrayData($requestBody, 'id', true, 'YumiSign transaction ID field is missing');
-                    try {
-                        $yumisignSession = $this->mapper->findTransaction($envelopeId);
-                    } catch (DoesNotExistException $e) {
-                        $warningMsg = "YumiSign transaction {$envelopeId} not found";
-                        LogYumiSign::write($warningMsg, __FUNCTION__);
-                        return Utility::warning($warningMsg);
+            $warningMsg = '';
+            $created = null;
+            $envelopeId = '';
+
+            // Get current document full path (filesystem)
+            $user = $this->userManager->get($userId);
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+
+            if (array_key_exists('documents', $requestBody)) {
+                foreach ($requestBody['documents'] as $key => $document) {
+                    if (array_key_exists('file', $document) && array_key_exists('file', $document['file'])) {
+                        $envelopeId = Utility::getArrayData($requestBody, 'id', true, 'YumiSign transaction ID field is missing');
+                        try {
+                            $yumisignSession = $this->mapper->findTransaction($envelopeId);
+                        } catch (DoesNotExistException $e) {
+                            $warningMsg = "YumiSign transaction {$envelopeId} not found";
+                            $this->logYumiSign->info($warningMsg, __FUNCTION__);
+                            return Utility::warning($warningMsg);
+                        }
+
+                        // Only one session in the result
+                        if ($yumisignSession->getApplicantId()) $applicantId    = $yumisignSession->getApplicantId();
+                        if ($yumisignSession->getFilePath())    $filePath       = $yumisignSession->getFilePath();
+                        // if ($yumisignSession->getWorkflowId())  $workflowId  = $yumisignSession->getWorkflowId();
+                        if ($yumisignSession->getFileId())      $fileId         = $yumisignSession->getFileId();
+
+                        $url = str_replace('\\', '', $document['file']['file']);
+                        $originalFilename            = trim($document['file']['name'], DIRECTORY_SEPARATOR);
+                        $originalFilenameNoExtension = pathinfo($originalFilename, PATHINFO_FILENAME);
+                        $originalExtension           = pathinfo($originalFilename, PATHINFO_EXTENSION);
+
+                        $ymsUrlArchive = $this->serverUrl . Constante::get(Cst::YMS_URL_ARCHIVE);
+
+                        $this->logYumiSign->debug($document['file']['file'], __FUNCTION__);
+                        $this->logYumiSign->debug($url, __FUNCTION__);
+                        $this->logYumiSign->debug($ymsUrlArchive, __FUNCTION__);
+
+                        $this->logYumiSign->debug(substr(parse_url($url, PHP_URL_PATH), 0, strlen(parse_url($ymsUrlArchive, PHP_URL_PATH))), __FUNCTION__);
+                        $this->logYumiSign->debug(parse_url($ymsUrlArchive, PHP_URL_PATH), __FUNCTION__);
+
+                        if (
+                            strcasecmp(
+                                substr(parse_url($url, PHP_URL_PATH), 0, strlen(parse_url($ymsUrlArchive, PHP_URL_PATH))),
+                                parse_url($ymsUrlArchive, PHP_URL_PATH)
+                            ) !== 0
+                        ) {
+                            $this->logYumiSign->warning(
+                                'EnvelopeID mismatch : ' .
+                                    parse_url(substr($url, 0, strlen($ymsUrlArchive))) .
+                                    ' versus ' .
+                                    parse_url($ymsUrlArchive),
+                                __FUNCTION__
+                            );
+                            $this->logYumiSign->warning($warningMsg, __FUNCTION__);
+                            throw new Exception("This url does not match to the Archives", 1);
+                        }
+
+                        $ch = $this->setCurlEnv($this->apiKey, $url, "GET", false);
+                        curl_setopt($ch, CURLOPT_HEADER, 0);
+                        $temporaryFile = curl_exec($ch);
+                        curl_close($ch);
+
+                        // Move the temporary file as the final timestamped file in user's folder (near the original file)
+                        $timestamp = $this->getUserLocalesTimestamp($applicantId, new DateTime());
+
+                        if (isset($fileId)) {
+                            $fileNode = $userFolder->getById($fileId)[0];
+                        } else {
+                            throw new Exception("File Id is not set for this envelopeId: {$envelopeId}", 404);
+                        }
+
+                        $folder = $fileNode->getParent();
+                        $fileName = sprintf(
+                            '%s_YumiSigned_%s.%s',
+                            $originalFilenameNoExtension,
+                            $timestamp,
+                            $originalExtension
+                        );
+
+                        // Have to add this try catch to prevent exception on External storages
+                        try {
+                            $this->logYumiSign->info("Saving file for user \"{$userId}\" [{$fileName}]");
+                            $created = $folder->newFile(
+                                $fileName,
+                                $temporaryFile
+                            );
+                        } catch (\Throwable $th) {
+                            $created = $folder->search($fileName)[0];
+                            //throw $th;
+                        }
+
+                        return [
+                            'fileNode' => $created,
+                            'error' => 0,
+                        ];
                     }
-
-                    // Only one session in the result
-                    if ($yumisignSession->getApplicantId()) $applicantId = $yumisignSession->getApplicantId();
-                    if ($yumisignSession->getFilePath())    $filePath    = $yumisignSession->getFilePath();
-                    if ($yumisignSession->getWorkflowId())  $workflowId  = $yumisignSession->getWorkflowId();
-
-                    $url = str_replace('\\', '', $document['file']['file']);
-                    $originalDirectory           = DIRECTORY_SEPARATOR . trim(pathinfo($filePath, PATHINFO_DIRNAME), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-                    $originalFilename            = trim($document['file']['name'], DIRECTORY_SEPARATOR);
-                    $originalFilenameNoExtension = pathinfo($originalFilename, PATHINFO_FILENAME);
-                    $originalExtension           = pathinfo($originalFilename, PATHINFO_EXTENSION);
-
-                    $ymsUrlArchive = $this->serverUrl . YMS_URL_ARCHIVE;
-                    if (
-                        strcasecmp(
-                            substr($url, 0, strlen($ymsUrlArchive)),
-                            $ymsUrlArchive
-                        ) !== 0
-                    ) throw new Exception("This url does not match to the Archives", 1);
-
-                    // Remove url header ($ymsUrlArchive) and keep workflow ID and Archive file ID
-                    $urlEnding = explode('/', substr($url, strlen($ymsUrlArchive)));
-
-                    // Check if workflow IDs match
-                    if ($yumisignSession->getWorkflowId()) $workflowId  = $yumisignSession->getWorkflowId();
-
-                    // Create temporary folder if needed
-                    if (!is_dir($this->temporaryFolder)) {
-                        mkdir($this->temporaryFolder);
-                    }
-
-                    // Download file and save it in temporary folder
-                    $temporaryFile = "{$this->temporaryFolder}{$urlEnding[2]}_{$applicantId}_{$workflowId}";
-                    $fh = fopen($temporaryFile, "w");
-                    $ch = $this->setCurlEnv($this->apiKey, $url, "GET", false);
-                    curl_setopt($ch, CURLOPT_FILE, $fh);
-
-                    curl_exec($ch);
-                    curl_close($ch);
-                    fclose($fh);
-
-                    // If file not saved throw exception
-                    if (!file_exists($temporaryFile) || filesize($temporaryFile) === 0) throw new Exception("File has not been saved", 1);
-
-                    // Move the temporary file as the final timestamped file in user's folder (near the original file)
-                    $config = new \OC\Config('config/');
-                    $base_path           = rtrim($config->getValue('datadirectory'), DIRECTORY_SEPARATOR);
-                    $currentUserFolder   = $this->storage->getUserFolder($applicantId);
-                    $documentFolder      = trim($currentUserFolder->getPath(), DIRECTORY_SEPARATOR);
-                    $destinationFullPath = sprintf(
-                        '%s%s_YumiSigned_%s.%s',
-                        $originalDirectory,
-                        $originalFilenameNoExtension,
-                        date('Y-m-d_H.i.s'),
-                        $originalExtension
-                    );
-
-                    // First check if destination folder exists
-                    if (!is_dir($base_path . DIRECTORY_SEPARATOR . $documentFolder . $originalDirectory)) throw new Exception("Destination folder does not exist", 1);
-
-                    // Move the downloaded file
-                    rename($temporaryFile, $base_path . DIRECTORY_SEPARATOR . $documentFolder . $destinationFullPath);
-
-                    $userFolder = $this->storage->getUserFolder($applicantId);
-                    $userFolder->touch($destinationFullPath);
                 }
             }
         } catch (\Throwable $th) {
-            throw $th;
+            $envelopeId = $envelopeId === '' ? 'undefined' : $envelopeId;
+            $this->logYumiSign->error("Issue on envelopeId {$envelopeId}: {$th->getMessage()}", __FUNCTION__);
+            return [
+                'fileNode' => $created,
+                'error' => $th->getCode(),
+            ];
         }
     }
 
     // Common function for cURL
-    private function setCurlEnv(string $apiKey, string $url, string $request, bool $contentTypeJson = true): CurlHandle
+    public function setCurlEnv(string $apiKey, string $url, string $request, bool $contentTypeJson = true): CurlHandle
     {
         $ch = curl_init();
 
@@ -1129,23 +1232,6 @@ class SignService
     {
         $returnValue = false;
 
-        // $timeout = 10;
-
-        // $ch = $this->setCurlEnv($this->apiKey, rtrim($request->getParam('server_url'), '/') . "/workspaces", "GET", false);
-
-        // curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-
-        // // Call YMS server
-        // $curlResponse = $this->getCurlResponse($ch);
-
-        // if (($curlResponse->code == "200") || ($curlResponse->code == "302")) {
-        //     $returnValue['status'] = "true";
-        //     $returnValue['message'] = json_decode($curlResponse->body)[0]->description;
-        // } else {
-        //     $returnValue = false;
-        // }
-        // curl_close($ch);
-
         return $returnValue;
     }
 
@@ -1182,7 +1268,7 @@ class SignService
                 $yumisignSession = $this->mapper->findRecipientTransaction($envelopeId, $recipient);
             } catch (DoesNotExistException $e) {
                 $warningMsg = "YumiSign transaction {$envelopeId} not found for recipient {$recipient}";
-                LogYumiSign::write($warningMsg, __FUNCTION__);
+                $this->logYumiSign->info($warningMsg, __FUNCTION__);
                 return Utility::warning($warningMsg);
             }
 
@@ -1198,7 +1284,7 @@ class SignService
             }
         } catch (\Throwable $th) {
             $exceptionMsg = $this->l->t("Critical error during process : \"{$processPrefix}\" / message: \"" . $th->getMessage() . "\" / {$envelopeId} / {$recipient} / {$globalStatus} / {$status}");
-            LogYumiSign::write($exceptionMsg, __FUNCTION__, true);
+            $this->logYumiSign->error($exceptionMsg, __FUNCTION__, true);
             throw new Exception($exceptionMsg, 1);
         }
     }
@@ -1212,7 +1298,7 @@ class SignService
             // Get header data
             if (empty($headerYumiSign)) {
                 $warningMsg = $this->l->t('YumiSign signature is missing');
-                LogYumiSign::write($warningMsg, __FUNCTION__);
+                $this->logYumiSign->warning($warningMsg, __FUNCTION__);
                 throw new Exception($warningMsg, 1);
             }
 
@@ -1222,10 +1308,6 @@ class SignService
 
             $envelopeId = Utility::getArrayData($requestBody, 'id',         true, 'YumiSign transaction ID field is missing');
             $status     = Utility::getArrayData($requestBody, 'status',     true, 'YumiSign transaction status field is missing');
-            // $createDate = Utility::getArrayData($requestBody, 'createDate', true, 'YumiSign transaction creation date field is missing');
-            // $expiryDate = Utility::getArrayData($requestBody, 'expiryDate', true, 'YumiSign transaction expiration date field is missing');
-            // $documents  = Utility::getArrayData($requestBody, 'documents',  true, 'YumiSign transaction documents fields are missing');
-            // $name       = Utility::getArrayData($requestBody, 'name',       true, 'YumiSign transaction name field is missing');
 
             $secret = "";
 
@@ -1233,7 +1315,7 @@ class SignService
                 $yumisignSession = $this->mapper->findTransaction($envelopeId);
             } catch (DoesNotExistException $e) {
                 $warningMsg = "YumiSign transaction {$envelopeId} not found";
-                LogYumiSign::write($warningMsg, __FUNCTION__);
+                $this->logYumiSign->warning($warningMsg, __FUNCTION__);
                 throw new Exception($warningMsg, 1);
             }
 
@@ -1241,7 +1323,7 @@ class SignService
             if ($yumisignSession->getSecret()) $secret = $yumisignSession->getSecret();
             else {
                 $warningMsg = "YumiSign transaction secret not found";
-                LogYumiSign::write($warningMsg, __FUNCTION__);
+                $this->logYumiSign->warning($warningMsg, __FUNCTION__);
                 throw new Exception($warningMsg, 1);
             }
 
@@ -1253,19 +1335,19 @@ class SignService
             // KO if not match
             if (!$match) {
                 $warningMsg = "YumiSign transaction bad key";
-                LogYumiSign::write($warningMsg, __FUNCTION__);
+                $this->logYumiSign->warning($warningMsg, __FUNCTION__);
                 throw new Exception($warningMsg, 1);
             }
 
             // Valid transaction, do what you need to do...
             switch ($status) {
-                case YMS_STATUS_NOT_STARTED:
-                case YMS_STATUS_APPROVED:
-                case YMS_STATUS_CANCELED:
-                case YMS_STATUS_DECLINED:
-                case YMS_STATUS_EXPIRED:
-                case YMS_STATUS_TO_BE_ARCHIVED:
-                case YMS_STATUS_STARTED:
+                case Constante::status(Status::NOT_STARTED):
+                case Constante::status(Status::APPROVED):
+                case Constante::status(Status::CANCELED):
+                case Constante::status(Status::DECLINED):
+                case Constante::status(Status::EXPIRED):
+                case Constante::status(Status::TO_BE_ARCHIVED):
+                case Constante::status(Status::STARTED):
                     // Update each recipient status
                     $steps = Utility::getArrayData($requestBody, 'steps',       true, 'YumiSign transaction steps fields are missing');
                     foreach ($steps as $step) {
@@ -1274,26 +1356,26 @@ class SignService
                         }
                     }
                     break;
-                case YMS_STATUS_SIGNED:
+                case Constante::get(Cst::YMS_SIGNED):
                     /**
                      * Only request status is available; the recipients status are not written in this Signed request
                      * So all status are updated as Signed (recipients + global)
                      */
                     $resp = $this->updateAllStatus($envelopeId, $status, $headerdata[1]);
                     // Save the files of this transaction (all recipients have signed)
-                    $resp = $this->saveTransactionFiles($requestBody);
+                    $resp = $this->saveTransactionFiles($requestBody, $yumisignSession->getApplicantId());
                     break;
                 default:
                     #code...
                     break;
             }
 
-            $processStatus['code'] = true;
+            $processStatus[Constante::get(Cst::CODE)] = true;
             $processStatus['message'] = "YumiSign transaction {status}";
             $processStatus['status'] = $status;
         } catch (\Throwable $th) {
             $warningMsg = "{$th->getMessage()} / Envelope ID : {$envelopeId}";
-            LogYumiSign::write($warningMsg, __FUNCTION__);
+            $this->logYumiSign->error($warningMsg, __FUNCTION__);
             $processStatus = Utility::warning($warningMsg);
         }
 
@@ -1313,8 +1395,177 @@ class SignService
                 $manager->notify($notification);
             }
         } catch (\Throwable $th) {
-            LogYumiSign::write($th->getMessage(), __FUNCTION__);
+            $this->logYumiSign->error($th->getMessage(), __FUNCTION__);
             return Utility::warning($th->getMessage());
         }
+    }
+
+    public function checkAsyncSignatureTask(string $applicantId = null)
+    {
+        try {
+            $this->logYumiSign->debug("########################################################################", __FUNCTION__);
+
+            $envelopesIds = [];
+            $transactionsToUpdate = [];
+            $rightNow = intval(time());
+
+            // Update expired transactions status and global status
+            $this->mapper->updateTransactionsStatusExpired();
+
+            // Count actives transactions
+            $countTransactions = $this->mapper->countTransactions($rightNow, $applicantId);
+            if ($countTransactions[Constante::get(Cst::CODE)] != 1) {
+                throw new Exception($countTransactions[Constante::get(Cst::ERROR)], 1);
+            }
+            // Just to have a clearer code ...
+            $countTransactions = $countTransactions[Constante::get(Cst::DATA)];
+
+            $realTransactionProcessed = 0;
+
+            $this->logYumiSign->debug("Transactions : {$countTransactions}", __FUNCTION__);
+
+            $nbPages = intdiv($countTransactions, $this->mapper->maxItems) + ($countTransactions % $this->mapper->maxItems > 0    ? 1 : 0);
+            $this->logYumiSign->debug("Pages : {$nbPages}", __FUNCTION__);
+
+            $startCheckProcess = new DateTime();
+            $this->logYumiSign->debug(sprintf("Start check process at %s", date_format($startCheckProcess, "Y/m/d H:i:s")), __FUNCTION__);
+
+            for ($cptPagesTransactions = 0; $cptPagesTransactions < $nbPages; $cptPagesTransactions++) {
+
+                // fet transactionsfor this page
+                $transactionsPage = $this->mapper->findAllEnvelopesIds($rightNow, $applicantId, $cptPagesTransactions, $this->mapper->maxItems);
+
+                $envelopesIds = [];
+                // Get all current page envelopeIds in only one curl call
+                foreach ($transactionsPage as $unitRecord) {
+                    $envelopesIds[$unitRecord->getEnvelopeId()] = [
+                        Constante::get(Cst::YMS_ENVELOPEID)    => $unitRecord->getEnvelopeId(),
+                        Constante::get(Cst::YMS_APPLICANTID)   => $unitRecord->getApplicantId(),
+                    ];
+                }
+
+                // Retrieve all the transactions corresponding to the current page envelopesIds
+                $curlSession = $this->retrieveEnvelopesIds($this->serverUrl, $this->apiKey, $envelopesIds);
+                $requestBody = json_decode($curlSession->body, true);
+
+                // Check if return request is without error
+                if (array_key_exists(Constante::yumisign(Yumisign::ERROR), $requestBody) && !is_null($requestBody[Constante::yumisign(Yumisign::ERROR)])) {
+                    $apiKeyRateLimitReached = ($requestBody[Constante::yumisign(Yumisign::ERROR)][Constante::yumisign(Yumisign::CODE)] === 'API_KEY_RATE_LIMIT_REACHED');
+                    $this->logYumiSign->error(sprintf("Something happened during YumiSign server calls; server sent this message: %s", $requestBody[Constante::yumisign(Yumisign::ERROR)][Constante::yumisign(Yumisign::MESSAGE)]), __FUNCTION__);
+                } else {
+                    // Prepare to update transations from retrieved data
+                    foreach ($requestBody as $actualTransaction) {
+
+                        switch (true) {
+                            case array_key_exists(Constante::yumisign(Yumisign::ERROR), $actualTransaction) && !is_null($actualTransaction[Constante::yumisign(Yumisign::ERROR)]):
+                                switch ($actualTransaction[Constante::yumisign(Yumisign::ERROR)][Constante::yumisign(Yumisign::CODE)]) {
+                                    case Constante::error(Error::YMS_ERR_ENVELOPE_NOT_FOUND):
+                                        $transactionsToUpdate[] = [
+                                            Constante::entity(Entity::ENVELOPE_ID)      => $actualTransaction[Constante::yumisign(Yumisign::IDENTIFIER)],
+                                            Constante::entity(Entity::APPLICANT_ID)     => $applicantId,
+                                            Constante::entity(Entity::STATUS)           => Constante::status(Status::NOT_FOUND),
+                                            Constante::entity(Entity::GLOBAL_STATUS)    => Constante::status(Status::NOT_FOUND),
+                                        ];
+                                        break;
+
+                                    default: // Set generic status
+                                        $transactionsToUpdate[] = [
+                                            Constante::entity(Entity::ENVELOPE_ID)      => $actualTransaction[Constante::yumisign(Yumisign::IDENTIFIER)],
+                                            Constante::entity(Entity::APPLICANT_ID)     => $applicantId,
+                                            Constante::entity(Entity::STATUS)           => Constante::status(Status::NOT_APPLICABLE),
+                                            Constante::entity(Entity::GLOBAL_STATUS)    => Constante::status(Status::NOT_APPLICABLE),
+                                        ];
+                                        break;
+                                }
+                                break;
+                            case array_key_exists(Constante::yumisign(Yumisign::ERROR), $actualTransaction) && is_null($actualTransaction[Constante::yumisign(Yumisign::ERROR)]):
+                                // Flag which indicated if we insert the array $currentTransaction after foreach loops
+                                $isCurrentTransactionInserted = false;
+                                $currentTransaction = [
+                                    Constante::entity(Entity::ENVELOPE_ID)      => $actualTransaction[Constante::yumisign(Yumisign::IDENTIFIER)],
+                                    Constante::entity(Entity::APPLICANT_ID)     => $applicantId,
+                                    Constante::entity(Entity::GLOBAL_STATUS)    => $actualTransaction[Constante::yumisign(Yumisign::RESPONSE)][Constante::yumisign(Yumisign::STATUS)],
+                                ];
+
+                                // if glpbal status is signed, save signed documents
+                                if ($currentTransaction[Constante::entity(Entity::GLOBAL_STATUS)] === Constante::status(Status::SIGNED)) {
+                                    $this->saveTransactionFiles(
+                                        $actualTransaction['response'],
+                                        // $userId,
+                                        $envelopesIds[$actualTransaction['response']['id']][Constante::get(Cst::YMS_APPLICANTID)],
+                                    );
+                                }
+
+                                // Check status for all recipients (will run if not signed)
+                                foreach ($actualTransaction[Constante::yumisign(Yumisign::RESPONSE)][Constante::yumisign(Yumisign::STEPS)] as $key => $step) {
+                                    foreach ($step[Constante::yumisign(Yumisign::ACTIONS)] as $key => $action) {
+
+                                        $currentTransaction[Constante::entity(Entity::RECIPIENT)]   = $action[Constante::yumisign(Yumisign::RECIPIENTEMAIL)];
+                                        $currentTransaction[Constante::entity(Entity::STATUS)]      = $action[Constante::yumisign(Yumisign::STATUS)];
+                                        $transactionsToUpdate[] = $currentTransaction; // We insert directly the current transaction inside the global array
+                                        $isCurrentTransactionInserted = true;
+                                    }
+                                }
+                                if (!$isCurrentTransactionInserted) {
+                                    $transactionsToUpdate[] = $currentTransaction;
+                                }
+                                break;
+                            default:
+                                $this->logYumiSign->warning(sprintf("This case is not implemented; please report a bug with the following data [%s]", json_encode($actualTransaction)), __FUNCTION__);
+                                break;
+                        }
+
+                        $realTransactionProcessed++;
+                    }
+                }
+
+                // Leave the loop before planned if YMS server is flooded
+                if ($apiKeyRateLimitReached) {
+                    break;
+                }
+            }
+
+            $endCheckProcess = new DateTime();
+
+            $sinceStart = $startCheckProcess->diff($endCheckProcess);
+            $this->logYumiSign->debug(sprintf("End check process at %s", date_format($endCheckProcess, "Y/m/d H:i:s")), __FUNCTION__);
+            $this->logYumiSign->info(sprintf("Data processed: %d records treated in %d d %d H %d m %d s", $realTransactionProcessed, $sinceStart->d, $sinceStart->h, $sinceStart->i, $sinceStart->s), __FUNCTION__);
+
+            // Update data in local DB
+            $startUpdatedata = new DateTime();
+            $this->logYumiSign->debug(sprintf("Start update process at %s", date_format($startUpdatedata, "Y/m/d H:i:s")), __FUNCTION__);
+
+            $realTransactionUpdated = $this->mapper->updateTransactionsStatus($transactionsToUpdate);
+            $endUpdatedata = new DateTime();
+
+            $sinceStart = $startUpdatedata->diff($endUpdatedata);
+
+            $this->logYumiSign->debug(sprintf("End update process at %s", date_format($endUpdatedata, "Y/m/d H:i:s")), __FUNCTION__);
+            $this->logYumiSign->info(sprintf("Database updated: %d records treated in %d d %d H %d m %d s", $realTransactionUpdated, $sinceStart->d, $sinceStart->h, $sinceStart->i, $sinceStart->s), __FUNCTION__);
+
+            return;
+        } catch (\Throwable $th) {
+            $this->logYumiSign->error($th->getMessage(), __FUNCTION__);
+            return Utility::warning($th->getMessage());
+        }
+    }
+
+    public function getUserLocalesTimestamp(string $userId, \DateTime $date)
+    {
+        $owner = $this->userManager->get($userId);
+        $lang = 'en';
+        $timeZone = $this->systemConfig->getUserValue($owner->getUID(), 'core', 'timezone', null);
+        $timeZone = isset($timeZone) ? new \DateTimeZone($timeZone) : new \DateTimeZone('UTC');
+
+        if ($lang) {
+            $l10n = $this->l10nFactory->get(YumiSignApp::APP_ID, $lang);
+            if (!$l10n) {
+                $l10n = $this->l10n;
+            }
+        } else {
+            $l10n = $this->l10n;
+        }
+        $date->setTimezone($timeZone);
+        return $date->format('Y-m-d H:i:s');
     }
 }

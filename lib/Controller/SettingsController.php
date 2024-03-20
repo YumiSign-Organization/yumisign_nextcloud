@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -23,13 +23,14 @@
 
 namespace OCA\YumiSignNxtC\Controller;
 
+use OCA\YumiSignNxtC\Service\Constante;
+use OCA\YumiSignNxtC\Service\Cst;
 use OCP\IRequest;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 
 use OCA\YumiSignNxtC\Service\SignService;
-use OCA\YumiSignNxtC\Utility\LogYumiSign;
 
 class SettingsController extends Controller
 {
@@ -49,21 +50,22 @@ class SettingsController extends Controller
 		$resp = $this->signService->lastJobRun();
 
 		return new JSONResponse([
-			YMS_CODE	=> $resp[YMS_CODE],
-			YMS_STATUS	=> $resp[YMS_STATUS],
-			YMS_MESSAGE => $resp[YMS_MESSAGE]
+			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
 	public function checkServerUrl()
 	{
-		$resp = $this->signService->checkServerUrl($this->request);
+		// $resp = $this->signService->checkServerUrl($this->request);
+		$resp = $this->signService->checkSettings();
 
 		return new JSONResponse([
-			YMS_CODE	=> $resp[YMS_CODE],
-			YMS_STATUS	=> $resp[YMS_STATUS],
-			YMS_ID		=> $resp[YMS_ID],
-			YMS_MESSAGE => $resp[YMS_MESSAGE]
+			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_ID)		 => $resp[Constante::get(Cst::YMS_ID)],
+			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -72,10 +74,14 @@ class SettingsController extends Controller
 	 */
 	public function checkSettings()
 	{
-		$serverUrl = $this->config->getAppValue('yumisign_nextcloud', 'server_url');
-		$empty = empty($serverUrl);
+		$resp = $this->signService->checkSettings();
 
-		return new JSONResponse(!$empty);
+		return new JSONResponse([
+			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_ID)		 => $resp[Constante::get(Cst::YMS_ID)],
+			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
+		]);
 	}
 
 	public function checkWorkspace()
@@ -83,11 +89,11 @@ class SettingsController extends Controller
 		$resp = $this->signService->checkWorkspace($this->request);
 
 		return new JSONResponse([
-			YMS_CODE	=> $resp[YMS_CODE],
-			YMS_STATUS	=> $resp[YMS_STATUS],
-			YMS_ID		=> $resp[YMS_ID],
-			YMS_LIST_ID	=> $resp[YMS_LIST_ID],
-			YMS_MESSAGE => $resp[YMS_MESSAGE]
+			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_ID)		 => $resp[Constante::get(Cst::YMS_ID)],
+			Constante::get(Cst::YMS_LIST_ID) => $resp[Constante::get(Cst::YMS_LIST_ID)],
+			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -96,9 +102,9 @@ class SettingsController extends Controller
 		$resp = $this->signService->resetJob();
 
 		return new JSONResponse([
-			YMS_CODE	=> $resp[YMS_CODE],
-			YMS_STATUS	=> $resp[YMS_STATUS],
-			YMS_MESSAGE => $resp[YMS_MESSAGE]
+			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -111,7 +117,7 @@ class SettingsController extends Controller
 		$this->config->setAppValue('yumisign_nextcloud', 'proxy_password',	$this->request->getParam('proxy_password'));
 		$this->config->setAppValue('yumisign_nextcloud', 'proxy_port',		$this->request->getParam('proxy_port'));
 		$this->config->setAppValue('yumisign_nextcloud', 'proxy_username',	$this->request->getParam('proxy_username'));
-		$this->config->setAppValue('yumisign_nextcloud', 'server_url',		rtrim($this->request->getParam('server_url'), '/'));
+		$this->config->setAppValue('yumisign_nextcloud', 'server_url',		'https://app.yumisign.com:443/api/v1');
 		$this->config->setAppValue('yumisign_nextcloud', 'sign_scope',		$this->request->getParam('sign_scope'));
 		$this->config->setAppValue('yumisign_nextcloud', 'use_proxy',		$this->request->getParam('use_proxy'));
 		$this->config->setAppValue('yumisign_nextcloud', 'workspace_id',	$this->request->getParam('workspace_id'));

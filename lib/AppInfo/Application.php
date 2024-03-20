@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -25,81 +25,52 @@ declare(strict_types=1);
 
 namespace OCA\YumiSignNxtC\AppInfo;
 
-use OCP\IServerContainer;
-
-use OCA\Files\Event\LoadAdditionalScriptsEvent;
+use OC\SystemConfig;
+use OCA\YumiSignNxtC\Activity\Listener as ActivityListener;
+// use OCA\YumiSignNxtC\Capabilities;
+use OCA\YumiSignNxtC\CSPSetter;
+use OCA\YumiSignNxtC\DeleteListener;
+use OCA\YumiSignNxtC\FilesLoader;
+use OCA\YumiSignNxtC\Manager;
+use OCA\YumiSignNxtC\Notification\Listener as NotificationListener;
+use OCA\YumiSignNxtC\Notification\Notifier;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\EventDispatcher\IEventDispatcher;
-use OCP\Util;
-use OCP\Notification\IManager;
-use OCA\YumiSignNxtC\Notification\Notifier;
+use OCP\IUser;
 
-require_once(__DIR__ . '/../../vendor/autoload.php');
+class Application extends App implements IBootstrap {
+	public const APP_ID = 'yumisign_nextcloud';
 
-define("YMS_ALREADY_CANCELLED",         "already_cancelled");
-define("YMS_CODE",                      "code");
-define("YMS_DELETED",                   "deleted");
-define("YMS_ERROR",                     "error");
-define("YMS_EXCEPTION",                 "Exception");
-define("YMS_ID",                        "id");
-define("YMS_IDENTIFIER",                "identifier");
-define("YMS_LIST_ID",                   "listId");
-define("YMS_MESSAGE",                   "message");
-define("YMS_NAME",                      "name");
-define("YMS_OWNER",                     "owner");
-define("YMS_RESPONSE",                  "response");
-define("YMS_RESULT",                    "result");
-define("YMS_SIGNED",                    "signed");
-define("YMS_SIMPLE",                    "simple");
-define("YMS_STARTED",                   "started");
-define("YMS_STATUS_APPROVED",           "approved");
-define("YMS_STATUS_CANCELED",           "canceled");
-define("YMS_STATUS_DECLINED",           "declined");
-define("YMS_STATUS_EXPIRED",            "expired");
-define("YMS_STATUS_NOT_STARTED",        "not_started");
-define("YMS_STATUS_SIGNED",             "signed");
-define("YMS_STATUS_STARTED",            "started");
-define("YMS_STATUS_TO_BE_ARCHIVED",     "to_be_archived");
-define("YMS_STATUS",                    "status");
-define("YMS_SUCCESS",                   "success");
-define("YMS_URL_ARCHIVE",               "/storage/archive/");
-define("YMS_VALUE",                     "value");
-define("YMS_WF_SECRET",                 "WorkflowNotificationCallbackUrlSecretPreference");
+	public function __construct(array $urlParams = []) {
+		parent::__construct(self::APP_ID, $urlParams);
+	}
 
-class Application extends App implements IBootstrap
-{
+	public function register(IRegistrationContext $context): void {
+		// $context->registerCapability(Capabilities::class);
+	}
 
-    public const APP_ID = 'yumisign_nextcloud';
+	public function boot(IBootContext $context): void {
+		$server = $context->getServerContainer();
 
-    public function __construct(array $urlParams = [])
-    {
-        parent::__construct(self::APP_ID, $urlParams);
+		$server->getNavigationManager()->add(function () use ($server) {
+			/** @var IUser $user */
+			$user = $server->getUserSession()->getUser();
+			return [
+				'id' => self::APP_ID,
+				'name' => $server->getL10N(self::APP_ID)->t('YumiSignNxtC'),
+				'href' => $server->getURLGenerator()->linkToRouteAbsolute(self::APP_ID . '.Page.index'),
+				'icon' => $server->getURLGenerator()->imagePath(self::APP_ID, 'app.svg'),
+				'order' => 3,
+				'type' => 'link',
+			];
+		});
 
-        $container = $this->getContainer();
-        $eventDispatcher = $container->get(IEventDispatcher::class);
-        $eventDispatcher->addListener(LoadAdditionalScriptsEvent::class, function () {
-            Util::addScript(self::APP_ID, 'yumisign_nextcloud-main');
-            Util::addStyle(self::APP_ID, 'style');
-        });
-    }
+		/** @var IEventDispatcher $dispatcher */
+		$dispatcher = $server->get(IEventDispatcher::class);
 
-    public function register(IRegistrationContext $context): void
-    {
-        $context->registerNotifierService(Notifier::class);
-    }
-
-    public function boot(IBootContext $context): void
-    {
-        $server = $context->getServerContainer();
-        $this->registerNotifier($server);
-    }
-
-    protected function registerNotifier(IServerContainer $server): void
-    {
-        $manager = $server->get(IManager::class);
-        $manager->registerNotifierService(Notifier::class);
-    }
+		FilesLoader::register($dispatcher);
+	}
 }
