@@ -783,7 +783,8 @@ class SignService
                 'name' => $wfName,
                 'document' => new CURLFILE(
                     'data://application/octet-stream;base64,' . base64_encode($file->getContent()),
-                    mime_content_type($file->getMimeType()),
+                    // mime_content_type($file->getMimeType()),
+                    $file->getMimeType(),
                     $file->getName()
                 ),
                 'type' => $signType,
@@ -1449,6 +1450,7 @@ class SignService
                 $requestBody = json_decode($curlSession->body, true);
 
                 // Check if return request is without error
+                $apiKeyRateLimitReached = false;
                 if (array_key_exists(Constante::yumisign(Yumisign::ERROR), $requestBody) && !is_null($requestBody[Constante::yumisign(Yumisign::ERROR)])) {
                     $apiKeyRateLimitReached = ($requestBody[Constante::yumisign(Yumisign::ERROR)][Constante::yumisign(Yumisign::CODE)] === 'API_KEY_RATE_LIMIT_REACHED');
                     $this->logYumiSign->error(sprintf("Something happened during YumiSign server calls; server sent this message: %s", $requestBody[Constante::yumisign(Yumisign::ERROR)][Constante::yumisign(Yumisign::MESSAGE)]), __FUNCTION__);

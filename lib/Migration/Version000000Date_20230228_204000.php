@@ -28,19 +28,19 @@ class Version000000Date_20230228_204000 extends SimpleMigrationStep
         /** @var ISchemaWrapper $schema */
         $schema = $schemaClosure();
 
-        $table = $schema->getTable('yumisign_nxtc_sess');
+        // $table = $schema->getTable('yumisign_nxtc_sess');
 
-        /**
-         * ###### Fri Mar 15 07:48:10 CET 2024
-         * Add check phase before altering table => issue reported for RCDevs Support
-         * Cause : maybe manual DB updates/deletions
-         */
-        if (!$table->hasColumn('global_status')) {
-            $table->addColumn('global_status', 'string', [
-                'notnull' => false,
-                'length' => 32
-            ]);
-        }
+        // /**
+        //  * ###### Fri Mar 15 07:48:10 CET 2024
+        //  * Add check phase before altering table => issue reported for RCDevs Support
+        //  * Cause : maybe manual DB updates/deletions
+        //  */
+        // if (!$table->hasColumn('global_status')) {
+        //     $table->addColumn('global_status', 'string', [
+        //         'notnull' => false,
+        //         'length' => 32
+        //     ]);
+        // }
 
         return $schema;
     }
