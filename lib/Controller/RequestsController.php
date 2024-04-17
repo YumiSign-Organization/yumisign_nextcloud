@@ -24,7 +24,6 @@
 namespace OCA\YumiSignNxtC\Controller;
 
 
-use \OCP\AppFramework\Http\RedirectResponse;
 use Exception;
 use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
 use OCA\YumiSignNxtC\Db\SignSession;
@@ -37,6 +36,7 @@ use OCA\YumiSignNxtC\Service\SignService;
 use OCA\YumiSignNxtC\Utility\Utility;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Collaboration\Collaborators\ISearch;
 use OCP\IRequest;

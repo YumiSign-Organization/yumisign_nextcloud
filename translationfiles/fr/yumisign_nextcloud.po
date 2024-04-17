@@ -4,6 +4,9 @@ msgstr "Paramètres de YumiSign pour Nextcloud"
 msgid "Enter your YumiSign server settings in the fields below."
 msgstr "Entrez les paramètres de votre serveur YumiSign dans les champs ci-dessous."
 
+msgid "After each settings modification, please save your settings."
+msgstr "Après chaque modification des paramètres, veuillez enregistrer vos paramètres."
+
 msgid "Use a proxy"
 msgstr "Utiliser un serveur proxy"
 
