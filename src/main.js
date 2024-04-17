@@ -20,25 +20,34 @@
  */
 
 import Vue from 'vue'
-import Vuex from 'vuex'
-import App from './App.vue'
-import { Tooltip } from '@nextcloud/vue'
+import { translate } from '@nextcloud/l10n'
+import EventBus from './EventBus'
+import YumiSignNxtCModal from './YumiSignNxtCModal'
 
-// Styles
-import '@nextcloud/dialogs/style.css'
+Vue.prototype.$t = translate
 
-Vue.prototype.t = t
-Vue.prototype.n = n
-Vue.prototype.OC = OC
-Vue.prototype.OCA = OCA
-Vue.prototype.OCP = OCP
+const signModalHolderId = 'yumisignsignModalHolder'
+const signModalHolder = document.createElement('div')
+signModalHolder.id = signModalHolderId
+document.body.append(signModalHolder)
 
-Vue.directive('tooltip', Tooltip)
+// eslint-disable-next-line
+new Vue({
+	el: signModalHolder,
+	render: h => {
+		return h(YumiSignNxtCModal)
+	},
+})
 
-Vue.use(Vuex)
-
-export default new Vue({
-	el: '#content',
-	// store,
-	render: h => h(App),
+OCA.Files.fileActions.registerAction({
+	mime: 'file',
+	name: 'YumiSignNxtC',
+	permissions: OC.PERMISSION_READ,
+	iconClass: 'icon-yumisign',
+	actionHandler: (filename, context) => {
+		// EventBus.$emit('yumisign-sign-click', { filename })
+		EventBus.$emit('yumisign-sign-click', { context })
+	},
+	displayName: t('yumisign_nextcloud', 'Sign with YumiSign'),
+	order: -100,
 })

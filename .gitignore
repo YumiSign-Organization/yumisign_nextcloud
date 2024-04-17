@@ -14,5 +14,3 @@ tests/php/.phpunit.result.cache
 tests/php/clover.xml
 /*.gitignore
 /*.l10nignore
-/composer.lock
-/package-lock.json

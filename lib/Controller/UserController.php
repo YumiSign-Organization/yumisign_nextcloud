@@ -93,74 +93,106 @@ class UserController extends Controller
 	/**
 	 * @NoAdminRequired
 	 */
-	public function getLocalUsers(string $search = '', string $type = ''): DataResponse
+	// public function getLocalUsers(string $search = '', string $type = ''): DataResponse
+	// {
+	// 	$shareTypes = [];
+	// 	switch ($type) {
+	// 		case 'user':
+	// 			$shareTypes[] = IShare::TYPE_USER;
+	// 			break;
+	// 		case 'email':
+	// 			$shareTypes[] = IShare::TYPE_EMAIL;
+	// 			break;
+	// 	}
+	// 	if (empty($shareTypes)) {
+	// 		return new DataResponse([], Http::STATUS_BAD_REQUEST);
+	// 	}
+
+	// 	$minLength = 3;
+	// 	if (strlen($search) < $minLength) {
+	// 		return new DataResponse([]);
+	// 	}
+
+	// 	$limit = 10;
+	// 	$offset = 0;
+	// 	$lookup = false;  // Don't use lookup server.
+	// 	[$result, $hasMoreResults] = $this->search->search($search, $shareTypes, $lookup, $limit, $offset);
+	// 	if ($type === 'user') {
+	// 		// Filter out users not allowed to use the app.
+	// 		$userCache = [];
+	// 		$filterFunc = function ($elem) use ($userCache) {
+	// 			$userId = $elem['value']['shareWith'];
+	// 			$user = $userCache[$userId] ?? null;
+	// 			if (!$user) {
+	// 				$user = $this->userManager->get($userId);
+	// 				if (!$user) {
+	// 					return true;
+	// 				}
+	// 				$userCache[$userId] = $user;
+	// 			}
+	// 			return $this->appManager->isEnabledForUser(YumiSignApp::APP_ID, $user);
+	// 		};
+
+	// 		$totalResults = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);
+	// 		if (isset($result['exact']['users'])) {
+	// 			$result['exact']['users'] = array_filter($result['exact']['users'], $filterFunc);
+	// 		}
+	// 		if (isset($result['users'])) {
+	// 			$result['users'] = array_filter($result['users'], $filterFunc);
+	// 		}
+	// 		$total = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);
+	// 		while ($totalResults > 0 && $total < $limit && $hasMoreResults) {
+	// 			$offset += $limit;
+	// 			[$additional, $hasMoreResults] = $this->search->search($search, $shareTypes, $lookup, $limit, $offset);
+	// 			$totalResults = count($additional['exact']['users'] ?? []) + count($additional['users'] ?? []);
+	// 			if (!$totalResults) {
+	// 				break;
+	// 			}
+
+	// 			if (isset($additional['exact']['users'])) {
+	// 				$additional['exact']['users'] = array_filter($additional['exact']['users'], $filterFunc);
+	// 			}
+	// 			if (isset($additional['users'])) {
+	// 				$additional['users'] = array_filter($additional['users'], $filterFunc);
+	// 			}
+	// 			$result['exact']['users'] = array_merge($result['exact']['users'], $additional['exact']['users']);
+	// 			$result['users'] = array_merge($result['users'], $additional['users']);
+	// 			$total = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);
+	// 		}
+	// 	}
+	// 	$response = new DataResponse($result);
+	// 	return $response;
+	// }
+
+		/**
+	 * @NoAdminRequired
+	 */
+	public function getLocalUsers()
 	{
-		$shareTypes = [];
-		switch ($type) {
-			case 'user':
-				$shareTypes[] = IShare::TYPE_USER;
-				break;
-			case 'email':
-				$shareTypes[] = IShare::TYPE_EMAIL;
-				break;
-		}
-		if (empty($shareTypes)) {
-			return new DataResponse([], Http::STATUS_BAD_REQUEST);
+		$cm = \OC::$server->getContactsManager();
+
+		// The API is not active -> nothing to do
+		if (!$cm->isEnabled()) {
+			$this->logger->error('Contact Manager not enabled');
+			return new JSONResponse();
 		}
 
-		$minLength = 3;
-		if (strlen($search) < $minLength) {
-			return new DataResponse([]);
-		}
+		$result = $cm->search($this->request->getParam('search'), array('FN', 'EMAIL'));
 
-		$limit = 10;
-		$offset = 0;
-		$lookup = false;  // Don't use lookup server.
-		[$result, $hasMoreResults] = $this->search->search($search, $shareTypes, $lookup, $limit, $offset);
-		if ($type === 'user') {
-			// Filter out users not allowed to use the app.
-			$userCache = [];
-			$filterFunc = function ($elem) use ($userCache) {
-				$userId = $elem['value']['shareWith'];
-				$user = $userCache[$userId] ?? null;
-				if (!$user) {
-					$user = $this->userManager->get($userId);
-					if (!$user) {
-						return true;
-					}
-					$userCache[$userId] = $user;
-				}
-				return $this->appManager->isEnabledForUser(YumiSignApp::APP_ID, $user);
-			};
+		$contacts = array();
+		foreach ($result as $raw_contact) {
+			$contact = array();
+			$contact['uid'] = $raw_contact['UID'];
+			$contact['display_name'] = $raw_contact['FN'];
 
-			$totalResults = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);
-			if (isset($result['exact']['users'])) {
-				$result['exact']['users'] = array_filter($result['exact']['users'], $filterFunc);
+			if (array_key_exists('EMAIL', $raw_contact)) {
+				$contact['email'] = $raw_contact['EMAIL'][0];
 			}
-			if (isset($result['users'])) {
-				$result['users'] = array_filter($result['users'], $filterFunc);
-			}
-			$total = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);
-			while ($totalResults > 0 && $total < $limit && $hasMoreResults) {
-				$offset += $limit;
-				[$additional, $hasMoreResults] = $this->search->search($search, $shareTypes, $lookup, $limit, $offset);
-				$totalResults = count($additional['exact']['users'] ?? []) + count($additional['users'] ?? []);
-				if (!$totalResults) {
-					break;
-				}
 
-				if (isset($additional['exact']['users'])) {
-					$additional['exact']['users'] = array_filter($additional['exact']['users'], $filterFunc);
-				}
-				if (isset($additional['users'])) {
-					$additional['users'] = array_filter($additional['users'], $filterFunc);
-				}
-				$result['exact']['users'] = array_merge($result['exact']['users'], $additional['exact']['users']);
-				$result['users'] = array_merge($result['users'], $additional['users']);
-				$total = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);
-			}
+			array_push($contacts, $contact);
 		}
-		$response = new DataResponse($result);
-		return $response;
+
+		return new JSONResponse($contacts);
 	}
+
 }

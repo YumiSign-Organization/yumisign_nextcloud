@@ -28,7 +28,6 @@ use OC\Config;
 use OC\Server;
 use OC\SystemConfig;
 use OCA\Activity\AppInfo\Application;
-use OCA\Certificate24\AppInfo\Application as AppInfoApplication;
 use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
 use OCP\IConfig;
 use Psr\Log\LoggerInterface;

@@ -43,7 +43,7 @@
 		</div>
 		<div class="ymsSettingsFooter">
 			<div v-if="itemId" class="">
-				{{ t('yumisign_nextcloud', 'You have selected:') }} {{ itemId }}
+				{{ $t('yumisign_nextcloud', 'You have selected:') }} {{ itemId }}
 			</div>
 			<div class="btns">
 				<button @click="_cancel">

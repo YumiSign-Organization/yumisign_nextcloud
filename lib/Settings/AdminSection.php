@@ -1,8 +1,7 @@
 <?php
-
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -21,7 +20,7 @@
  *
  */
 
-namespace OCA\YumiSignNxtC\Settings\Admin;
+namespace OCA\YumiSignNxtC\Settings;
 
 use OCP\IL10N;
 use OCP\IURLGenerator;
