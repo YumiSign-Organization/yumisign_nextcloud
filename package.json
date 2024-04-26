@@ -1,7 +1,7 @@
 {
 	"name": "yumisign_nextcloud",
 	"description": "Nextcloud app to sign your documents with YumiSign",
-	"version": "1.27.0",
+	"version": "1.27.1",
 	"author": "RCDevs <info@rcdevs.com>",
 	"bugs": {
 		"url": "https://github.com/rcdevs/nextcloud_yumisign_nextcloud/issues"

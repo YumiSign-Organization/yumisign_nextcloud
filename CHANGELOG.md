@@ -6,6 +6,13 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.28.1
+	Improvement: displayed name on YumiSign push or email is no longer the userId
+
+1.27.1
+	Improvement: displayed name on YumiSign push or email is no longer the userId
+	Fix: FR typo error
+
 1.28.0
 	Fix: Send to nextcloud user; if uid is an email, it will be used as email
 	Add: Prevent using self signature if email is not defined for the current user or uid is not an email

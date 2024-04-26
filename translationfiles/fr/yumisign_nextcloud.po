@@ -781,5 +781,5 @@ msgid "Installed version"
 msgstr "Version installée"
 
 msgid "More information here"
-msgstr "Davanatge d'information ici"
+msgstr "Davantage d'information ici"
 

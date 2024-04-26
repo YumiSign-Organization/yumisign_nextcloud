@@ -24,14 +24,11 @@
 namespace OCA\YumiSignNxtC\Controller;
 
 use \OCP\AppFramework\Http\RedirectResponse;
-use Exception;
-use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
-use OCA\YumiSignNxtC\Db\SignSession;
 use OCA\YumiSignNxtC\Db\SignSessionMapper;
 use OCA\YumiSignNxtC\Service\Constante;
 use OCA\YumiSignNxtC\Service\Cst;
-use OCA\YumiSignNxtC\Service\CurlResponse;
 use OCA\YumiSignNxtC\Service\SignService;
+use OCA\YumiSignNxtC\Service\Yumisign;
 use OCA\YumiSignNxtC\Utility\Utility;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
@@ -41,16 +38,15 @@ use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\IUserSession;
-use OCP\Notification\IManager;
-use OCP\Share\IShare;
 use OCP\Util;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\JsonResponse as HttpFoundationJsonResponse;
 
 class SignController extends Controller
 {
 
-	private $userId;
+	private string $userId;
+	private string $userEmail;
+	private array $userIntel;
 	private $signService;
 	private $logger;
 	private $mapper;
@@ -77,6 +73,24 @@ class SignController extends Controller
 		$this->mapper = $mapper;
 
 		$this->userManager = $userManager;
+
+		// Get user email
+		$this->userEmail = $this->userManager->get($this->userId)->getEMailAddress();
+		// If standard email is empty and userId is an email, use userId
+		if (empty($this->userEmail) && filter_var($this->userId, FILTER_VALIDATE_EMAIL)) {
+			$this->userEmail = $this->userId;
+		}
+
+		// Define "Sender name" which will be displayed on YMS push/email : "You received a signature request from ..."
+		$displayName = $this->userManager->get($this->userId)->getDisplayName();
+		if (empty($displayName)) {
+			$displayName = $this->userEmail;
+		}
+
+		$this->userIntel = [
+			Constante::get(Cst::USERID)					=> $this->userId,
+			Constante::yumisign(Yumisign::SENDERNAME)	=> $displayName,
+		];
 	}
 
 	/**
@@ -84,25 +98,14 @@ class SignController extends Controller
 	 */
 	public function mobileSign()
 	{
-		// Retrieve current user email from Nextcloud database
-		$currentUser = $this->userManager->get($this->userId);
-
-		// If userId is an email, not needed to search an email...
-		if (filter_var($this->userId, FILTER_VALIDATE_EMAIL)) {
-			$currentUserEmail = $this->userId;
-		} else {
-			$currentUserEmail = $currentUser->getEMailAddress();
-		}
-
-
-		if (empty($currentUserEmail) && empty($this->request->getParam('email'))) {
+		if (empty($this->userEmail) && empty($this->request->getParam('email'))) {
 			$resp['code'] = false;
 			$resp['message'] = "No email address found for this user";
 		} else {
 			$resp = $this->signService->asyncExternalMobileSignPrepare(
 				$this->request->getParam('path'),
-				$currentUserEmail,
-				$this->userId,
+				$this->userEmail,
+				$this->userIntel,
 				$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
 				$this->request->getParam('signatureType'),
 				$this->request->getParam('fileId')
@@ -144,7 +147,7 @@ class SignController extends Controller
 			$resp = $this->signService->asyncExternalMobileSignPrepare(
 				$this->request->getParam('path'),
 				(empty($nextcloudUser->getEMailAddress()) ? $this->request->getParam('email') : $nextcloudUser->getEMailAddress()),
-				$this->userId,
+				$this->userIntel,
 				$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
 				$this->request->getParam('signatureType'),
 				$this->request->getParam('fileId'),
@@ -175,7 +178,7 @@ class SignController extends Controller
 		$resp = $this->signService->asyncExternalMobileSignPrepare(
 			$this->request->getParam('path'),
 			$this->request->getParam('email'),
-			$this->userId,
+			$this->userIntel,
 			$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
 			$this->request->getParam('signatureType'),
 			$this->request->getParam('fileId'),

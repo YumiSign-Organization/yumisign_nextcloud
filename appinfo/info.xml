@@ -4,7 +4,7 @@
 	<id>yumisign_nextcloud</id>
     <name>YumiSign for Nextcloud</name>
 
-    <version>1.27.0</version>
+    <version>1.27.1</version>
     <dependencies>
         <php min-version="8.1" />
         <nextcloud min-version="27" max-version="27" />
@@ -71,10 +71,10 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
 	<repository>https://github.com/rcdevs/yumisign_nextcloud.git</repository>
 
     <screenshot>
-        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/main/screenshots/screenshot-menu.png
+        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/N27/screenshots/screenshot-menu.png
     </screenshot>
     <screenshot>
-        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/main/screenshots/screenshot-modal.png
+        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/N27/screenshots/screenshot-modal.png
     </screenshot>
 
     <category>files</category>

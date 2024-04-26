@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "econea/nusoap",
-            "version": "v0.9.16",
+            "version": "v0.9.17",
             "source": {
                 "type": "git",
                 "url": "https://github.com/f00b4r/nusoap.git",
-                "reference": "9ead68ec7ad8d1e14943658ce1559435247d14bf"
+                "reference": "ac2322f37808ecb1a2b84ed469cba9c51648eb8d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/f00b4r/nusoap/zipball/9ead68ec7ad8d1e14943658ce1559435247d14bf",
-                "reference": "9ead68ec7ad8d1e14943658ce1559435247d14bf",
+                "url": "https://api.github.com/repos/f00b4r/nusoap/zipball/ac2322f37808ecb1a2b84ed469cba9c51648eb8d",
+                "reference": "ac2322f37808ecb1a2b84ed469cba9c51648eb8d",
                 "shasum": ""
             },
             "require": {
@@ -64,7 +64,7 @@
             ],
             "support": {
                 "issues": "https://github.com/f00b4r/nusoap/issues",
-                "source": "https://github.com/f00b4r/nusoap/tree/v0.9.16"
+                "source": "https://github.com/f00b4r/nusoap/tree/v0.9.17"
             },
             "funding": [
                 {
@@ -72,7 +72,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-07-19T12:40:31+00:00"
+            "time": "2024-01-25T09:08:59+00:00"
         },
         {
             "name": "setasign/fpdf",
@@ -244,5 +244,5 @@
     "prefer-lowest": false,
     "platform": [],
     "platform-dev": [],
-    "plugin-api-version": "2.2.0"
+    "plugin-api-version": "2.6.0"
 }

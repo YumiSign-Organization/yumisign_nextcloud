@@ -122,6 +122,6 @@ OC.L10N.register(
     "signed" : "signée",
     "started" : "débutée",
     "Installed version" : "Version installée",
-    "More information here" : "Davanatge d'information ici"
+    "More information here" : "Davantage d'information ici"
 },
 "nplurals=2; plural=(n > 1);");
