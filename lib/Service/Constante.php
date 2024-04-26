@@ -58,6 +58,7 @@ enum Cst: string
 	case YMS_URL_ARCHIVE				= '/storage/archive/';
 	case YMS_VALUE						= 'value';
 	case YMS_WF_SECRET					= 'WorkflowNotificationCallbackUrlSecretPreference';
+	CASE USERID							= 'userId';
 }
 // Errors codes from YuniSign server
 enum Error: string
@@ -93,6 +94,7 @@ enum Yumisign: string
 	case ACTIONS			= 'actions';
 	case RECIPIENTEMAIL		= 'recipientEmail';
 	case STATUSCODE			= 'statusCode';
+	case SENDERNAME			= 'senderName';
 }
 
 enum Entity: string{

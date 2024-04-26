@@ -252,13 +252,12 @@ class SignService
         return $return;
     }
 
-    public function asyncExternalMobileSignPrepare($path, $email, $userId, $appUrl, $signatureType, $fileId)
+    public function asyncExternalMobileSignPrepare($path, $email, array $userIntel, $appUrl, $signatureType, $fileId)
     {
         $resp = [];
 
         logger('yumisign_nextcloud')->debug('fileId : ' . json_encode($fileId));
 
-        // $user = $this->userManager->get($userId);
         $user = $this->userSession->getUser();
 
         // Get current document full path (filesystem)
@@ -271,7 +270,7 @@ class SignService
 
         // Create a workflow
         $expiryDate = strtotime("+{$this->asyncTimeout} days");
-        $curlWorkflow = $this->createWorkflow($this->serverUrl, $this->apiKey, $this->workspaceId, $userId, $fileNode, strtolower($signatureType), $expiryDate);
+        $curlWorkflow = $this->createWorkflow($this->serverUrl, $this->apiKey, $this->workspaceId, $userIntel[Constante::yumisign(Yumisign::SENDERNAME)], $fileNode, strtolower($signatureType), $expiryDate);
         $workflow = json_decode($curlWorkflow->body);
 
         // Initialize workflow preferences
@@ -324,7 +323,7 @@ class SignService
         foreach ($debriefWorkflow->recipients as $dbwRecipients) {
             // Insert row in DB
             $signSession = new SignSession();
-            $signSession->setApplicantId($userId);
+            $signSession->setApplicantId($userIntel[Constante::get(Cst::USERID)]);
             $signSession->setFilePath($filePath);
             $signSession->setWorkspaceId($this->workspaceId);
             $signSession->setWorkflowId($workflow->id);
@@ -768,7 +767,7 @@ class SignService
         return $return;
     }
 
-    private function createWorkflow(string $serverUrl, string $apiKey, int $workspaceId, string $userId, File $file, string $signType, int $expiryDate): CurlResponse
+    private function createWorkflow(string $serverUrl, string $apiKey, int $workspaceId, string $senderName, File $file, string $signType, int $expiryDate): CurlResponse
     {
         $processPrefix = sprintf("%s/%s/%s", basename(__FILE__, '.php'), __FUNCTION__, "Creating YumiSign workflow");
 
@@ -783,13 +782,12 @@ class SignService
                 'name' => $wfName,
                 'document' => new CURLFILE(
                     'data://application/octet-stream;base64,' . base64_encode($file->getContent()),
-                    // mime_content_type($file->getMimeType()),
                     $file->getMimeType(),
                     $file->getName()
                 ),
                 'type' => $signType,
                 'expiryDate' => $expiryDate,
-                'senderName' => $userId,
+                'senderName' => $senderName,
             );
             curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
 

@@ -32,7 +32,9 @@ class Version000000Date_20240325_095600 extends SimpleMigrationStep
             $table = $schema->getTable('yumisign_nxtc_sess');
 
             // Check if index exists
-            $table->dropIndex('yumisign_applicantId_idx');
+            if ($table->hasIndex('yumisign_applicantId_idx')) {
+                $table->dropIndex('yumisign_applicantId_idx');
+            }
 
             // Drop table
             $schema->dropTable('yumisign_nxtc_sess');
