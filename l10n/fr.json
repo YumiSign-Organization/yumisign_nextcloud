@@ -1,6 +1,7 @@
 { "translations": {
     "YumiSign for Nextcloud Settings" : "Paramètres de YumiSign pour Nextcloud",
     "Enter your YumiSign server settings in the fields below." : "Entrez les paramètres de votre serveur YumiSign dans les champs ci-dessous.",
+    "After each settings modification, please save your settings." : "Après chaque modification des paramètres, veuillez enregistrer vos paramètres.",
     "Use a proxy" : "Utiliser un serveur proxy",
     "Proxy Host" : "Hôte du serveur proxy",
     "Proxy Port" : "Port du serveur proxy",

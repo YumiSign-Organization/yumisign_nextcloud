@@ -20,8 +20,8 @@
  */
 
 
-// const appInfo = require('../appinfo/info.xml');
 // TODO   will be replaced by API call
+// const appInfo = require('../appinfo/info.xml');
 // const appName = appInfo.info.id[0];
 const appName = 'yumisign_nextcloud';
 const baseUrl = `apps/${appName}`;

@@ -27,7 +27,7 @@ import { FileAction, Permission, registerFileAction } from '@nextcloud/files'
 import '@nextcloud/dialogs/style.css'
 
 import YumiSignNxtCModal from './views/YumiSignNxtCModal.vue'
-import Logo from '../img/app-dark.svg?raw'
+import Logo from '../img/YumiSign.svg?raw'
 import './styles/loader.scss'
 
 Vue.prototype.t = t
@@ -60,7 +60,7 @@ app.$on('dialog:closed', () => {
 })
 
 registerFileAction(new FileAction({
-	id: 'yumisign_nextcloud-sign',
+	id: 'yumisign_nextcloud',
 	displayName: () => t('yumisign_nextcloud', 'Sign with YumiSign'),
 	iconSvgInline: () => Logo,
 	enabled: (files, view) => {
@@ -72,3 +72,4 @@ registerFileAction(new FileAction({
 		app.$emit('dialog:open', file)
 	},
 }))
+

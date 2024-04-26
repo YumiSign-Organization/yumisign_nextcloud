@@ -3,6 +3,13 @@
 		xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>yumisign_nextcloud</id>
     <name>YumiSign for Nextcloud</name>
+
+	<version>1.28.1</version>
+    <dependencies>
+        <php min-version="8.2" />
+        <nextcloud min-version="28" max-version="28" />
+    </dependencies>
+
     <summary>Nextcloud app to sign your documents with YumiSign</summary>
     <description><![CDATA[# Electronic Signature
 This YumiSign Plugin for Nextcloud allows users to digitally sign documents directly within the Nextcloud platform. With this plugin, you can securely sign PDFs, Word documents, and other supported file types with ease, ensuring the integrity and authenticity of your documents.
@@ -15,8 +22,9 @@ This YumiSign Plugin for Nextcloud allows users to digitally sign documents dire
 * Secure signing process with audit trail for document verification.
 
 # Requirements
-* Nextcloud instance (version X.X or higher).
-* Access to Nextcloud's admin account for installation.
+* YumiSign account.
+* YumiSign API key.
+* HTTPS access to YumiSign server from your Nextcloud server.
 
 # Installation
 
@@ -53,14 +61,12 @@ For more support and information:
 Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.com) to purchase e-signature credits.
 ]]></description>
 
-	<version>1.1.4</version>
-	<licence>agpl</licence>
-
     <author mail="info@rcdevs.com">RCDevs</author>
+	<licence>agpl</licence>
 
 	<namespace>YumiSignNxtC</namespace>
 
-	<website>https://www.yumisign_nextcloud.com</website>
+	<website>https://www.yumisign.com</website>
 	<bugs>https://github.com/rcdevs/yumisign_nextcloud/issues</bugs>
 	<repository>https://github.com/rcdevs/yumisign_nextcloud.git</repository>
 
@@ -76,15 +82,9 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
     <category>tools</category>
     <category>security</category>
 
-    <dependencies>
-        <php min-version="8.2" />
-        <nextcloud min-version="28" max-version="28" />
-    </dependencies>
-
     <documentation>
 		<user>https://app.yumisign.com/help/</user>
 	</documentation>
-
 
 	<settings>
 		<admin>OCA\YumiSignNxtC\Settings\Admin\AdminSettings</admin>
@@ -94,5 +94,4 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
     <background-jobs>
         <job>OCA\YumiSignNxtC\BackgroundJob\CheckAsyncSignatureTask</job>
     </background-jobs>
-
 </info>
