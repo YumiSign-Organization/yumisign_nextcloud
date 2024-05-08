@@ -338,6 +338,7 @@ class SignService
             $signSession->setGlobalStatus($debriefWorkflow->status);
             $signSession->setMsgDate($debriefWorkflow->createDate);
             $signSession->setFileId($fileId);
+            $signSession->setMutex('');
 
             $this->mapper->insert($signSession);
         }
@@ -1066,9 +1067,11 @@ class SignService
         return $return;
     }
 
-    public function saveTransactionFiles(array $requestBody, string $userId)
+    public function saveTransactionFiles(array $requestBody, string $userId, string $fromFunction)
     {
         try {
+            $threadId = bin2hex(random_bytes(8));
+            $this->logYumiSign->info("Saving transaction files for user [{$userId}] / Sent from fct [{$fromFunction}]", __FUNCTION__);
             $warningMsg = '';
             $created = null;
             $envelopeId = '';
@@ -1079,16 +1082,47 @@ class SignService
 
             if (array_key_exists('documents', $requestBody)) {
                 foreach ($requestBody['documents'] as $key => $document) {
+                    $this->logYumiSign->debug(sprintf('Foreach Doc [%s]', json_encode($document)), __FUNCTION__);
+
                     if (array_key_exists('file', $document) && array_key_exists('file', $document['file'])) {
                         $envelopeId = Utility::getArrayData($requestBody, 'id', true, 'YumiSign transaction ID field is missing');
+                        $this->logYumiSign->debug(sprintf('EnvelopeId [%s]', $envelopeId), __FUNCTION__);
+
                         try {
+                            // Update if exists the envelope Id with this Thread Id as Mutex
+                            $this->mapper->updateTransactionsMutex($threadId, $envelopeId);
+                            // Get the envelope Id and check if the Mutex === thread Id; if OK, this thread will save the file
                             $yumisignSession = $this->mapper->findTransaction($envelopeId);
                         } catch (DoesNotExistException $e) {
                             $warningMsg = "YumiSign transaction {$envelopeId} not found";
                             $this->logYumiSign->info($warningMsg, __FUNCTION__);
-                            return Utility::warning($warningMsg);
+                            return [
+                                'code'      => 0,
+                                'saved'     => false,
+                                'fileNode' => null,
+                                'error' => Utility::warning($warningMsg),
+                            ];
                         }
 
+                        // If Mutex is not empty and not equal to Thread Id, it means another process handles it
+                        $this->logYumiSign->debug(sprintf('Thread is %s', $threadId), __FUNCTION__);
+                        $this->logYumiSign->debug(sprintf('Mutex  is %s', $yumisignSession->getMutex()), __FUNCTION__);
+                        if (
+                            $yumisignSession->getMutex() !== ''
+                            && !is_null($yumisignSession->getMutex())
+                            && $yumisignSession->getMutex() !== $threadId
+                        ) {
+                            $this->logYumiSign->debug(sprintf('Ignore this EnvId',), __FUNCTION__);
+                            return [
+                                'code'      => 1,
+                                'saved'     => false,
+                                'fileNode' => null,
+                                'error' => 0,
+                            ];
+                        }
+                        $this->logYumiSign->debug(sprintf('Save this EnvId',), __FUNCTION__);
+
+                        // Here, this Thread will handle the transaction file
                         // Only one session in the result
                         if ($yumisignSession->getApplicantId()) $applicantId    = $yumisignSession->getApplicantId();
                         if ($yumisignSession->getFilePath())    $filePath       = $yumisignSession->getFilePath();
@@ -1133,6 +1167,8 @@ class SignService
 
                         // Move the temporary file as the final timestamped file in user's folder (near the original file)
                         $timestamp = $this->getUserLocalesTimestamp($applicantId, new DateTime());
+                        $this->logYumiSign->debug(sprintf('Timestamp [%s]', $timestamp), __FUNCTION__);
+
 
                         if (isset($fileId)) {
                             $fileNode = $userFolder->getById($fileId)[0];
@@ -1150,7 +1186,7 @@ class SignService
 
                         // Have to add this try catch to prevent exception on External storages
                         try {
-                            $this->logYumiSign->info("Saving file for user \"{$userId}\" [{$fileName}]");
+                            $this->logYumiSign->info("Saving file for user \"{$userId}\" [{$fileName}]", __FUNCTION__);
                             $created = $folder->newFile(
                                 $fileName,
                                 $temporaryFile
@@ -1160,7 +1196,11 @@ class SignService
                             //throw $th;
                         }
 
+                        $this->logYumiSign->debug(sprintf('Created [%s]', $fileName), __FUNCTION__);
+
                         return [
+                            'code'      => 1,
+                            'saved'     => true,
                             'fileNode' => $created,
                             'error' => 0,
                         ];
@@ -1171,8 +1211,10 @@ class SignService
             $envelopeId = $envelopeId === '' ? 'undefined' : $envelopeId;
             $this->logYumiSign->error("Issue on envelopeId {$envelopeId}: {$th->getMessage()}", __FUNCTION__);
             return [
-                'fileNode' => $created,
-                'error' => $th->getCode(),
+                'code'      => 0,
+                'saved'     => false,
+                'fileNode'  => $created,
+                'error'     => $th->getCode(),
             ];
         }
     }
@@ -1360,9 +1402,12 @@ class SignService
                      * Only request status is available; the recipients status are not written in this Signed request
                      * So all status are updated as Signed (recipients + global)
                      */
-                    $resp = $this->updateAllStatus($envelopeId, $status, $headerdata[1]);
                     // Save the files of this transaction (all recipients have signed)
-                    $resp = $this->saveTransactionFiles($requestBody, $yumisignSession->getApplicantId());
+                    $resp = $this->saveTransactionFiles($requestBody, $yumisignSession->getApplicantId(), __FUNCTION__);
+                    // Change status if file is saved: prevent to lose records in DB
+                    if ($resp['code'] === 1) {
+                        $resp = $this->updateAllStatus($envelopeId, $status, $headerdata[1]);
+                    }
                     break;
                 default:
                     #code...
@@ -1457,6 +1502,7 @@ class SignService
                     foreach ($requestBody as $actualTransaction) {
 
                         switch (true) {
+                                // Ban transactions which are invalid
                             case array_key_exists(Constante::yumisign(Yumisign::ERROR), $actualTransaction) && !is_null($actualTransaction[Constante::yumisign(Yumisign::ERROR)]):
                                 switch ($actualTransaction[Constante::yumisign(Yumisign::ERROR)][Constante::yumisign(Yumisign::CODE)]) {
                                     case Constante::error(Error::YMS_ERR_ENVELOPE_NOT_FOUND):
@@ -1478,6 +1524,7 @@ class SignService
                                         break;
                                 }
                                 break;
+                                // Manage transactions which are valid
                             case array_key_exists(Constante::yumisign(Yumisign::ERROR), $actualTransaction) && is_null($actualTransaction[Constante::yumisign(Yumisign::ERROR)]):
                                 // Flag which indicated if we insert the array $currentTransaction after foreach loops
                                 $isCurrentTransactionInserted = false;
@@ -1489,27 +1536,32 @@ class SignService
 
                                 // if glpbal status is signed, save signed documents
                                 if ($currentTransaction[Constante::entity(Entity::GLOBAL_STATUS)] === Constante::status(Status::SIGNED)) {
-                                    $this->saveTransactionFiles(
+                                    $resp = $this->saveTransactionFiles(
                                         $actualTransaction['response'],
                                         // $userId,
                                         $envelopesIds[$actualTransaction['response']['id']][Constante::get(Cst::YMS_APPLICANTID)],
+                                        __FUNCTION__,
                                     );
                                 }
 
-                                // Check status for all recipients (will run if not signed)
-                                foreach ($actualTransaction[Constante::yumisign(Yumisign::RESPONSE)][Constante::yumisign(Yumisign::STEPS)] as $key => $step) {
-                                    foreach ($step[Constante::yumisign(Yumisign::ACTIONS)] as $key => $action) {
+                                // Change status if file is saved: prevent to lose records in DB
+                                if ($resp['code'] === 1) {
+                                    // Check status for all recipients (will run if not signed)
+                                    foreach ($actualTransaction[Constante::yumisign(Yumisign::RESPONSE)][Constante::yumisign(Yumisign::STEPS)] as $key => $step) {
+                                        foreach ($step[Constante::yumisign(Yumisign::ACTIONS)] as $key => $action) {
 
-                                        $currentTransaction[Constante::entity(Entity::RECIPIENT)]   = $action[Constante::yumisign(Yumisign::RECIPIENTEMAIL)];
-                                        $currentTransaction[Constante::entity(Entity::STATUS)]      = $action[Constante::yumisign(Yumisign::STATUS)];
-                                        $transactionsToUpdate[] = $currentTransaction; // We insert directly the current transaction inside the global array
-                                        $isCurrentTransactionInserted = true;
+                                            $currentTransaction[Constante::entity(Entity::RECIPIENT)]   = $action[Constante::yumisign(Yumisign::RECIPIENTEMAIL)];
+                                            $currentTransaction[Constante::entity(Entity::STATUS)]      = $action[Constante::yumisign(Yumisign::STATUS)];
+                                            $transactionsToUpdate[] = $currentTransaction; // We insert directly the current transaction inside the global array
+                                            $isCurrentTransactionInserted = true;
+                                        }
                                     }
                                 }
                                 if (!$isCurrentTransactionInserted) {
                                     $transactionsToUpdate[] = $currentTransaction;
                                 }
                                 break;
+                                // Should not happen... humhum...
                             default:
                                 $this->logYumiSign->warning(sprintf("This case is not implemented; please report a bug with the following data [%s]", json_encode($actualTransaction)), __FUNCTION__);
                                 break;
