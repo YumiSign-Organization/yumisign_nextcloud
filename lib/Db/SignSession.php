@@ -45,6 +45,7 @@ class SignSession extends Entity implements JsonSerializable
     protected $workflowId;
     protected $workflowName;
     protected $workspaceId;
+    protected $mutex;
 
     public function __construct()
     {
@@ -71,6 +72,7 @@ class SignSession extends Entity implements JsonSerializable
             'workflow_id'   => $this->workflowId,
             'workflow_name' => $this->workflowName,
             'workspace_id'  => $this->workspaceId,
+            'mutex'         => $this->mutex,
         ];
     }
 }

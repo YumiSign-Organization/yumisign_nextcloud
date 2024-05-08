@@ -6,8 +6,27 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.29.0
+	Improvement: add Mutex on async Saving Signed Files process
+	Fix: a String null exception occured when current user email was empty
+	Fix: DB alias error on inner join (occured on PostgreSql engine)
+
+1.28.2
+	Improvement: add Mutex on async Saving Signed Files process
+	Fix: a String null exception occured when current user email was empty
+	Fix: DB alias error on inner join (occured on PostgreSql engine)
+
+1.27.2
+	Improvement: add Mutex on async Saving Signed Files process
+	Fix: a String null exception occured when current user email was empty
+	Fix: DB alias error on inner join (occured on PostgreSql engine)
+
 1.28.1
 	Improvement: displayed name on YumiSign push or email is no longer the userId
+
+1.27.1
+	Improvement: displayed name on YumiSign push or email is no longer the userId
+	Fix: FR typo error
 
 1.28.0
 	Fix: Send to nextcloud user; if uid is an email, it will be used as email

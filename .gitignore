@@ -16,4 +16,3 @@ tests/php/clover.xml
 /*.l10nignore
 /composer.lock
 /package-lock.json
-Thumbs.db
