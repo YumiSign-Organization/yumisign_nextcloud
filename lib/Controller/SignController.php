@@ -45,7 +45,7 @@ class SignController extends Controller
 {
 
 	private string $userId;
-	private string $userEmail;
+	private string|null $userEmail;
 	private array $userIntel;
 	private $signService;
 	private $logger;

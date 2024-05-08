@@ -103,6 +103,7 @@ enum Entity: string{
 	case ENVELOPE_ID		= 'envelope_id';
 	case EXPIRY_DATE		= 'expiry_date';
 	case GLOBAL_STATUS		= 'global_status';
+	case MUTEX				= 'mutex';
 	case RECIPIENT			= 'recipient';
 	case STATUS				= 'status';
 	case WORKFLOW_ID		= 'workflow_id';

@@ -23,8 +23,6 @@
 
 namespace OCA\YumiSignNxtC\Db;
 
-use DateTime;
-use OC\SystemConfig;
 use OCA\YumiSignNxtC\Service\Constante;
 use OCA\YumiSignNxtC\Service\Cst;
 use OCA\YumiSignNxtC\Service\Entity;
@@ -32,7 +30,6 @@ use OCA\YumiSignNxtC\Service\Status;
 use OCA\YumiSignNxtC\Utility\Utility;
 use OCA\YumiSignNxtC\Utility\LogYumiSign;
 use OCP\IDBConnection;
-use OCP\AppFramework\Db\QBMap1per;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\IResult;
 use OCP\DB\QueryBuilder\IQueryBuilder;
@@ -42,8 +39,8 @@ class SignSessionMapper extends QBMapper
 
     public int $maxItems = 50;
     public int $backInTime = 3600; // Use to find users' last activity and to reduce the number of retrieved transactions
-    private string $tablesPrefix;
     private string $tableAlias = 'ymsSess';
+    private string $nxcToken = '';
 
     public function __construct(
         IDBConnection $db,
@@ -55,7 +52,6 @@ class SignSessionMapper extends QBMapper
             SignSession::class
         );
         $this->db = $db;
-        $this->tablesPrefix = \OC::$server->get(SystemConfig::class)->getValue('dbtableprefix', 'oc_');
     }
 
     /**
@@ -141,14 +137,14 @@ class SignSessionMapper extends QBMapper
         $queryBuilder->join(
             $this->tableAlias,
             'authtoken',
-            'nxcToken',
-            "nxcToken.uid = {$this->tableAlias}.applicant_id"
+            $this->nxcToken,
+            'uid = applicant_id',
         );
     }
 
     private function whereLastActivity(int $rightNow, IQueryBuilder &$queryBuilder)
     {
-        $queryBuilder->andWhere('nxcToken.last_activity >= :paramLastActivityBackInTime')
+        $queryBuilder->andWhere('last_activity >= :paramLastActivityBackInTime')
             ->setParameter('paramLastActivityBackInTime', intval($rightNow) - $this->backInTime, IQueryBuilder::PARAM_INT);
     }
 
@@ -343,9 +339,6 @@ class SignSessionMapper extends QBMapper
 
         $queryBuilder->select('reserved_at', 'last_run')
             ->from('jobs')
-            // ->where($queryBuilder->expr()->like('class', $queryBuilder->createNamedParameter(
-            //     '%' . $this->db->escapeLikeParameter('\YumiSignNxtC\\') . '%'
-            // )));
             ->where($queryBuilder->expr()->eq('class', $queryBuilder->createNamedParameter('OCA\YumiSignNxtC\Cron\CheckAsyncSignatureTask')));
 
         $cursor = $queryBuilder->executeQuery();
@@ -506,7 +499,6 @@ class SignSessionMapper extends QBMapper
             ->setParameter('reserved_at', 0)
             ->where($queryBuilder->expr()->like('class', $queryBuilder->createNamedParameter(
                 '%' . $this->db->escapeLikeParameter('\YumiSignNxtC\\') . '%'
-                // '%\\YumiSignNxtC\\%'
             )));
 
         $queryBuilder->executeStatement();
@@ -543,19 +535,11 @@ class SignSessionMapper extends QBMapper
 
     public function updateTransactionsStatus(array $transactionsToUpdate): int
     {
-        $this->db->beginTransaction();
         $realTransactionUpdated = 0;
         try {
             foreach ($transactionsToUpdate as $unitTransactionToUpdate) {
                 $queryBuilder = $this->db->getQueryBuilder();
                 $queryBuilder->update('yumisign_nxtc_sess')
-                    // status
-                    // ->set(Constante::entity(Entity::STATUS), $queryBuilder->createParameter(Constante::entity(Entity::STATUS)))
-                    // ->setParameter(Constante::entity(Entity::STATUS), $unitTransactionToUpdate[Constante::entity(Entity::STATUS)])
-                    // global status
-                    // ->set(Constante::entity(Entity::GLOBAL_STATUS), $queryBuilder->createParameter(Constante::entity(Entity::GLOBAL_STATUS)))
-                    // ->setParameter(Constante::entity(Entity::GLOBAL_STATUS), $unitTransactionToUpdate[Constante::entity(Entity::GLOBAL_STATUS)])
-                    // change_status
                     ->set(Constante::entity(Entity::CHANGE_STATUS), $queryBuilder->createParameter(Constante::entity(Entity::CHANGE_STATUS)))
                     ->setParameter(Constante::entity(Entity::CHANGE_STATUS), time())
 
@@ -566,24 +550,15 @@ class SignSessionMapper extends QBMapper
                 $this->setGlobalStatusIfExists($unitTransactionToUpdate, $queryBuilder);
 
 
-                // if (!is_null($unitTransactionToUpdate[Constante::entity(Entity::APPLICANT_ID)])) {
-                //     $queryBuilder->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::APPLICANT_ID), $queryBuilder->createNamedParameter($unitTransactionToUpdate[Constante::entity(Entity::APPLICANT_ID)])));
-                // }
                 $this->whereApplicantIfExists(Utility::getIfExists(Constante::entity(Entity::APPLICANT_ID), $unitTransactionToUpdate), $queryBuilder);
 
-                // if (array_key_exists(Constante::entity(Entity::RECIPIENT), $unitTransactionToUpdate)) {
-                //     $queryBuilder->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::RECIPIENT), $queryBuilder->createNamedParameter($unitTransactionToUpdate[Constante::entity(Entity::RECIPIENT)])));
-                // }
                 $this->whereRecipientIfExists(Utility::getIfExists(Constante::entity(Entity::RECIPIENT), $unitTransactionToUpdate), $queryBuilder);
 
                 $queryBuilder->executeStatement();
                 $realTransactionUpdated++;
             }
-
-            $this->db->commit();
         } catch (\Throwable $th) {
-            $this->db->rollBack();
-            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__);
+            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . __FILE__ . DIRECTORY_SEPARATOR . __LINE__);
 
             throw $th;
         }
@@ -593,7 +568,6 @@ class SignSessionMapper extends QBMapper
 
     public function updateTransactionsStatusExpired(): void
     {
-        $this->db->beginTransaction();
         try {
             $queryBuilder = $this->db->getQueryBuilder();
             $queryBuilder->update('yumisign_nxtc_sess')
@@ -610,11 +584,43 @@ class SignSessionMapper extends QBMapper
                 ->where($queryBuilder->expr()->lt(Constante::entity(Entity::EXPIRY_DATE), $queryBuilder->createNamedParameter(intval(time()))));
 
             $queryBuilder->executeStatement();
-
-            $this->db->commit();
         } catch (\Throwable $th) {
-            $this->db->rollBack();
-            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__);
+            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . __FILE__ . DIRECTORY_SEPARATOR . __LINE__);
+
+            throw $th;
+        }
+    }
+
+    public function updateTransactionsMutex(string $threadId, string $envelopeId, string $recipient = ''): void
+    {
+        // Not needed to use transactional query
+        try {
+            $queryBuilder = $this->db->getQueryBuilder();
+            $queryBuilder->select('*')
+                ->from($this->getTableName())
+                ->where($queryBuilder->expr()->eq(Constante::entity(Entity::ENVELOPE_ID), $queryBuilder->createNamedParameter($envelopeId)))
+                ->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::MUTEX), $queryBuilder->createNamedParameter('')));
+
+            if ($recipient !== '') $queryBuilder->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::RECIPIENT), $queryBuilder->createNamedParameter($recipient)));
+
+            $resp = $this->findEntities($queryBuilder);
+
+            $queryBuilder = $this->db->getQueryBuilder();
+            $queryBuilder->update('yumisign_nxtc_sess')
+                // mutex
+                ->set(Constante::entity(Entity::MUTEX), $queryBuilder->createParameter(Constante::entity(Entity::MUTEX)))
+                ->setParameter(Constante::entity(Entity::MUTEX), $threadId)
+
+                ->where($queryBuilder->expr()->eq(Constante::entity(Entity::ENVELOPE_ID), $queryBuilder->createNamedParameter($envelopeId)))
+                ->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::MUTEX), $queryBuilder->createNamedParameter('')));
+
+            if ($recipient !== '') $queryBuilder->andWhere($queryBuilder->expr()->eq(Constante::entity(Entity::RECIPIENT), $queryBuilder->createNamedParameter($recipient)));
+
+            $resp = $queryBuilder->executeStatement();
+
+            $this->logYumiSign->debug(sprintf('UPD response : %d', $resp), __FUNCTION__);
+        } catch (\Throwable $th) {
+            $this->logYumiSign->error(sprintf("Exception during updating status with message: %s", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . __FILE__ . DIRECTORY_SEPARATOR . __LINE__);
 
             throw $th;
         }
