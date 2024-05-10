@@ -4,7 +4,7 @@
 	<id>yumisign_nextcloud</id>
     <name>YumiSign for Nextcloud</name>
 
-	<version>1.29.0</version>
+	<version>1.29.1</version>
     <dependencies>
         <php min-version="8.2" />
         <nextcloud min-version="29" max-version="29" />

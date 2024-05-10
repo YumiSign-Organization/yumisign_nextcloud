@@ -50,16 +50,13 @@ class AdminSettings implements ISettings
     public function getForm(): TemplateResponse
     {
         $initialSettings = [
-
-            //'server_url' =>         $this->config->getAppValue('yumisign_nextcloud', 'server_url'),
-
             'installedVersion'  => $this->config->getAppValue('yumisign_nextcloud', 'installed_version'),
             'apiKey'            => $this->config->getAppValue('yumisign_nextcloud', 'api_key'),
             'workspaceId'       => $this->config->getAppValue('yumisign_nextcloud', 'workspace_id'),
             'workspaceName'     => $this->config->getAppValue('yumisign_nextcloud', 'workspace_name'),
             'defaultDomain'     => $this->config->getAppValue('yumisign_nextcloud', 'default_domain'),
             'userSettings'      => $this->config->getAppValue('yumisign_nextcloud', 'user_settings'),
-            'useProxy'          => $this->config->getAppValue('yumisign_nextcloud', 'use_proxy'),
+            'useProxy'          => empty($this->config->getAppValue('yumisign_nextcloud', 'use_proxy')) ? '0' : $this->config->getAppValue('yumisign_nextcloud', 'use_proxy'),
             'proxyHost'         => $this->config->getAppValue('yumisign_nextcloud', 'proxy_host'),
             'proxyPort'         => $this->config->getAppValue('yumisign_nextcloud', 'proxy_port'),
             'proxyUsername'     => $this->config->getAppValue('yumisign_nextcloud', 'proxy_username'),

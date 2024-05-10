@@ -50,9 +50,9 @@ class SettingsController extends Controller
 		$resp = $this->signService->lastJobRun();
 
 		return new JSONResponse([
-			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
-			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
-			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
+			Constante::get(Cst::CODE)	 		=> $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 	=> $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_MESSAGE) 	=> $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -62,10 +62,10 @@ class SettingsController extends Controller
 		$resp = $this->signService->checkSettings();
 
 		return new JSONResponse([
-			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
-			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
-			Constante::get(Cst::YMS_ID)		 => $resp[Constante::get(Cst::YMS_ID)],
-			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
+			Constante::get(Cst::CODE)	 		=> $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 	=> $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_ID)		 	=> $resp[Constante::get(Cst::YMS_ID)],
+			Constante::get(Cst::YMS_MESSAGE) 	=> $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -77,10 +77,10 @@ class SettingsController extends Controller
 		$resp = $this->signService->checkSettings();
 
 		return new JSONResponse([
-			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
-			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
-			Constante::get(Cst::YMS_ID)		 => $resp[Constante::get(Cst::YMS_ID)],
-			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
+			Constante::get(Cst::CODE)			=> $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 	=> $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_ID)		 	=> $resp[Constante::get(Cst::YMS_ID)],
+			Constante::get(Cst::YMS_MESSAGE) 	=> $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -89,11 +89,11 @@ class SettingsController extends Controller
 		$resp = $this->signService->checkWorkspace($this->request);
 
 		return new JSONResponse([
-			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
-			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
-			Constante::get(Cst::YMS_ID)		 => $resp[Constante::get(Cst::YMS_ID)],
-			Constante::get(Cst::YMS_LIST_ID) => $resp[Constante::get(Cst::YMS_LIST_ID)],
-			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
+			Constante::get(Cst::CODE)	 		=> $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)	 	=> $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_ID)		 	=> $resp[Constante::get(Cst::YMS_ID)],
+			Constante::get(Cst::YMS_LIST_ID) 	=> $resp[Constante::get(Cst::YMS_LIST_ID)],
+			Constante::get(Cst::YMS_MESSAGE) 	=> $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
@@ -102,9 +102,9 @@ class SettingsController extends Controller
 		$resp = $this->signService->resetJob();
 
 		return new JSONResponse([
-			Constante::get(Cst::CODE)	 => $resp[Constante::get(Cst::CODE)],
-			Constante::get(Cst::YMS_STATUS)	 => $resp[Constante::get(Cst::YMS_STATUS)],
-			Constante::get(Cst::YMS_MESSAGE) => $resp[Constante::get(Cst::YMS_MESSAGE)]
+			Constante::get(Cst::CODE)	 		=> $resp[Constante::get(Cst::CODE)],
+			Constante::get(Cst::YMS_STATUS)		=> $resp[Constante::get(Cst::YMS_STATUS)],
+			Constante::get(Cst::YMS_MESSAGE)	=> $resp[Constante::get(Cst::YMS_MESSAGE)]
 		]);
 	}
 
