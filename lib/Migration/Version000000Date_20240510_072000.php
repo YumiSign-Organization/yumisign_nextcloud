@@ -8,7 +8,7 @@ use OCP\IDBConnection;
 use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
 
-class Version000000Date_20240507_164500 extends SimpleMigrationStep
+class Version000000Date_20240510_072000 extends SimpleMigrationStep
 {
     private $db;
 
@@ -31,6 +31,7 @@ class Version000000Date_20240507_164500 extends SimpleMigrationStep
         $table = $schema->getTable('yumisign_nxtc_sess');
 
         // Add Mutex for Async processes
+        // The same as previous migScript but an issue occured on customer DB
         if (!$table->hasColumn('mutex')) {
             $table->addColumn('mutex', 'string', [
                 'notnull' => false,
