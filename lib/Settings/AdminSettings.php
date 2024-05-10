@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2023, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -56,7 +56,7 @@ class AdminSettings implements ISettings
             'description' =>        $this->config->getAppValue('yumisign_nextcloud', 'description'),
             'default_domain' =>     $this->config->getAppValue('yumisign_nextcloud', 'default_domain'),
             'user_settings' =>      $this->config->getAppValue('yumisign_nextcloud', 'user_settings'),
-            'use_proxy' =>          $this->config->getAppValue('yumisign_nextcloud', 'use_proxy'),
+            'use_proxy' =>          empty($this->config->getAppValue('yumisign_nextcloud', 'use_proxy')) ? '0' : $this->config->getAppValue('yumisign_nextcloud', 'use_proxy'),
             'proxy_host' =>         $this->config->getAppValue('yumisign_nextcloud', 'proxy_host'),
             'proxy_port' =>         $this->config->getAppValue('yumisign_nextcloud', 'proxy_port'),
             'proxy_username' =>     $this->config->getAppValue('yumisign_nextcloud', 'proxy_username'),

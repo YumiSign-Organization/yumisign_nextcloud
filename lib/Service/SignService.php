@@ -1545,7 +1545,7 @@ class SignService
                                 }
 
                                 // Change status if file is saved: prevent to lose records in DB
-                                if ($resp['code'] === 1) {
+                                if (isset($resp) && $resp['code'] === 1) {
                                     // Check status for all recipients (will run if not signed)
                                     foreach ($actualTransaction[Constante::yumisign(Yumisign::RESPONSE)][Constante::yumisign(Yumisign::STEPS)] as $key => $step) {
                                         foreach ($step[Constante::yumisign(Yumisign::ACTIONS)] as $key => $action) {
