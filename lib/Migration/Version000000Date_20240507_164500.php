@@ -37,7 +37,7 @@ class Version000000Date_20240507_164500 extends SimpleMigrationStep
                 'length' => 32
             ]);
         } else {
-            $table->modifyColumn('mutex', [
+            $table->changeColumn('mutex', [
                 'notnull' => false,
                 'length' => 32
             ]);

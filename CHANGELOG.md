@@ -6,6 +6,10 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.27.4
+• Fix: migration issue for field "Mutex": using old Doctrine library
+• Update: info.xml
+
 1.29.1
 • Fix: migration issue for field "Mutex" which throws Null Exception if YumiSign sessions exist in database
 • Fix: graphic issue for field "Use proxy": check box could have a "no-Yes" and "no-No" value; no impact on functionality

@@ -8,7 +8,7 @@ use OCP\IDBConnection;
 use OCP\Migration\SimpleMigrationStep;
 use OCP\Migration\IOutput;
 
-class Version000000Date_20240510_072000 extends SimpleMigrationStep
+class Version000000Date_20240513_112000 extends SimpleMigrationStep
 {
     private $db;
 
