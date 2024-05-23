@@ -6,6 +6,19 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.29.2
+• Fix: Modal modification by adding a class "rcdevsXZY" and changing associated CSS property
+
+1.28.4
+• Fix: Modal modification by adding a class "rcdevsXZY" and changing associated CSS property
+
+1.27.5
+• Fix: Modal modification by adding a class "rcdevsXZY" and changing associated CSS property
+
+1.27.4
+• Fix: migration issue for field "Mutex": using old Doctrine library
+• Update: info.xml
+
 1.29.1
 • Fix: migration issue for field "Mutex" which throws Null Exception if YumiSign sessions exist in database
 • Fix: graphic issue for field "Use proxy": check box could have a "no-Yes" and "no-No" value; no impact on functionality

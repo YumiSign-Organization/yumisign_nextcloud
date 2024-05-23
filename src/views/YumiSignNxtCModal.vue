@@ -20,89 +20,87 @@
 -->
 
 <template>
-	<div class="ymsModal">
-		<NcModal :show.sync="modal" @close="closeModal" :outTransition="true" :aria-label="t(appName, 'Sign with YumiSign')">
-			<div ref="ymsModalForm" class="ymsModalContent">
-				<h1 class="ymsModalTitle">
-					{{ t(appName, 'YumiSign for Nextcloud') }}
-				</h1>
+	<NcModal class="rcdevsYmsModal" :show.sync="modal" @close="closeModal" :outTransition="true" :aria-label="t(appName, 'Sign with YumiSign')">
+		<div ref="ymsModalForm" class="ymsModalContent">
+			<h1 class="ymsModalTitle">
+				{{ t(appName, 'YumiSign for Nextcloud') }}
+			</h1>
 
-				<div v-if="isSettingKO()" id="errorSettings" class="alert alertDanger">
-					{{ ui.messages.warningServer }}
+			<div v-if="isSettingKO()" id="errorSettings" class="alert alertDanger">
+				{{ ui.messages.warningServer }}
+			</div>
+
+			<ymsModalMainContainer v-if="isSettingOK()">
+				<div v-if="!success">
+					<img :src="ui.pictures.mobileSigningImg" style="max-height: 200px" />
 				</div>
 
-				<ymsModalMainContainer v-if="isSettingOK()">
-					<div v-if="!success">
-						<img :src="ui.pictures.mobileSigningImg" style="max-height: 200px" />
-					</div>
+				<greenTick v-if="isSuccesNotSimpleTypeSignature()">
+					<span> &#10003; </span>
+				</greenTick>
 
-					<greenTick v-if="isSuccesNotSimpleTypeSignature()">
-						<span> &#10003; </span>
-					</greenTick>
+				<div class="chosenFile">
+					<span>
+						{{ ui.messages.filenameMessage }}
+					</span>
+					<span class="filename">
+						{{ getBasename() }}
+					</span>
+				</div>
 
-					<div class="chosenFile">
-						<span>
-							{{ ui.messages.filenameMessage }}
-						</span>
-						<span class="filename">
-							{{ getBasename() }}
-						</span>
-					</div>
+				<p v-if="error" class="error">
+					{{ errorMessage }}
+				</p>
 
-					<p v-if="error" class="error">
-						{{ errorMessage }}
-					</p>
+				<br />
 
-					<br />
+				<recipientsChoices v-if="!isTransactionInProgress()">
+					<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.self)">
+						<NcCheckboxRadioSwitch v-if="!selfDisabled" :checked.sync="recipientType" :value="constantes.self" :disabled="selfDisabled" name="ymsRecipientRadio" type="radio">
+							{{ t(appName, 'Self-signature') }}
+						</NcCheckboxRadioSwitch>
+						<DisplaySelfEmail>
+							<span>{{ currentUserFullData }}</span>
+						</DisplaySelfEmail>
+					</recipientsSignleChoice>
 
-					<recipientsChoices v-if="!isTransactionInProgress()">
-						<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.self)">
-							<NcCheckboxRadioSwitch v-if="!selfDisabled" :checked.sync="recipientType" :value="constantes.self" :disabled="selfDisabled" name="ymsRecipientRadio" type="radio">
-								{{ t(appName, 'Self-signature') }}
-							</NcCheckboxRadioSwitch>
-							<DisplaySelfEmail>
-								<span>{{ currentUserFullData }}</span>
-							</DisplaySelfEmail>
-						</recipientsSignleChoice>
+					<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.nextcloud)">
+						<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.nextcloud" name="ymsRecipientRadio" type="radio">
+							{{ t(appName, 'Signature by a Nextcloud user') }}
+						</NcCheckboxRadioSwitch>
+						<SelectNextcloudUsers>
+							<NcTextField ref="userField" v-observe-visibility="userVisibilityChanged" :disabled="shareLoading" :value.sync="user" type="text" :placeholder="t(appName, 'Search users')" trailing-button-icon="close" :trailing-button-label="cancelSearchLabel" :show-trailing-button="isSearchingUser" @trailing-button-click="abortUserSearch" @input="handleUserInput">
+								<Magnify :size="16" />
+							</NcTextField>
+							<SearchResults v-if="user !== ''" :search-text="user" :search-results="userResults" :entries-loading="usersLoading" :no-results="noUserResults" :scrollable="true" :selectable="true" @click="addUser" />
+						</SelectNextcloudUsers>
+					</recipientsSignleChoice>
 
-						<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.nextcloud)">
-							<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.nextcloud" name="ymsRecipientRadio" type="radio">
-								{{ t(appName, 'Signature by a Nextcloud user') }}
-							</NcCheckboxRadioSwitch>
-							<SelectNextcloudUsers>
-								<NcTextField ref="userField" v-observe-visibility="userVisibilityChanged" :disabled="shareLoading" :value.sync="user" type="text" :placeholder="t(appName, 'Search users')" trailing-button-icon="close" :trailing-button-label="cancelSearchLabel" :show-trailing-button="isSearchingUser" @trailing-button-click="abortUserSearch" @input="handleUserInput">
-									<Magnify :size="16" />
-								</NcTextField>
-								<SearchResults v-if="user !== ''" :search-text="user" :search-results="userResults" :entries-loading="usersLoading" :no-results="noUserResults" :scrollable="true" :selectable="true" @click="addUser" />
-							</SelectNextcloudUsers>
-						</recipientsSignleChoice>
+					<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.external)">
+						<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.external" name="ymsRecipientRadio" type="radio">
+							{{ t(appName, 'Signature by email') }}
+						</NcCheckboxRadioSwitch>
+						<InputUsersEmails>
+							<input v-model="externalUserEmail" type="text" :placeholder="`${ui.messages.placeHolderEmail}`" />
+						</InputUsersEmails>
+					</recipientsSignleChoice>
+				</recipientsChoices>
 
-						<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.external)">
-							<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.external" name="ymsRecipientRadio" type="radio">
-								{{ t(appName, 'Signature by email') }}
-							</NcCheckboxRadioSwitch>
-							<InputUsersEmails>
-								<input v-model="externalUserEmail" type="text" :placeholder="`${ui.messages.placeHolderEmail}`" />
-							</InputUsersEmails>
-						</recipientsSignleChoice>
-					</recipientsChoices>
+				<div v-if="isRequesting()">
+					<img :src="ui.pictures.loadingImg" />
+				</div>
+			</ymsModalMainContainer>
 
-					<div v-if="isRequesting()">
-						<img :src="ui.pictures.loadingImg" />
-					</div>
-				</ymsModalMainContainer>
-
-				<ymsModalFooter>
-					<button v-if="isSettingKO()" type="button" @click="closeModal" class="closeModal">
-						{{ t(appName, 'Close') }}
-					</button>
-					<button v-if="isSettingOK()" type="button" @click="submitSignature" class="submitSignature">
-						{{ t(appName, 'Digital signature') }}
-					</button>
-				</ymsModalFooter>
-			</div>
-		</NcModal>
-	</div>
+			<ymsModalFooter>
+				<button v-if="isSettingKO()" type="button" @click="closeModal" class="closeModal">
+					{{ t(appName, 'Close') }}
+				</button>
+				<button v-if="isSettingOK()" type="button" @click="submitSignature" class="submitSignature">
+					{{ t(appName, 'Digital signature') }}
+				</button>
+			</ymsModalFooter>
+		</div>
+	</NcModal>
 </template>
 
 <script>
