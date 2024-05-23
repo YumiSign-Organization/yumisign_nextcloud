@@ -6,6 +6,15 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.29.2
+• Fix: Modal modification by adding a class "rcdevsXZY" and changing associated CSS property
+
+1.28.4
+• Fix: Modal modification by adding a class "rcdevsXZY" and changing associated CSS property
+
+1.27.5
+• Fix: Modal modification by adding a class "rcdevsXZY" and changing associated CSS property
+
 1.27.4
 • Fix: migration issue for field "Mutex": using old Doctrine library
 • Update: info.xml

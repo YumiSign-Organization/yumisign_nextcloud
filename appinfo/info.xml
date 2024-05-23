@@ -5,7 +5,6 @@
     <name>YumiSign for Nextcloud</name>
 
     <summary>Nextcloud app to sign your documents with YumiSign</summary>
-
     <description><![CDATA[# Electronic Signature
 This YumiSign Plugin for Nextcloud allows users to digitally sign documents directly within the Nextcloud platform. With this plugin, you can securely sign PDFs, Word documents, and other supported file types with ease, ensuring the integrity and authenticity of your documents.
 
@@ -56,11 +55,9 @@ For more support and information:
 Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.com) to purchase e-signature credits.
 ]]></description>
 
-    <version>1.27.4</version>
-
+    <version>1.27.5</version>
     <licence>agpl</licence>
     <author mail="info@rcdevs.com">RCDevs</author>
-
     <namespace>YumiSignNxtC</namespace>
 
     <documentation>
@@ -69,8 +66,8 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
 
     <category>files</category>
     <category>office</category>
-    <category>tools</category>
     <category>security</category>
+    <category>tools</category>
 
     <website>https://www.yumisign.com</website>
     <bugs>https://github.com/rcdevs/yumisign_nextcloud/issues</bugs>
@@ -84,7 +81,7 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
     </screenshot>
 
     <dependencies>
-        <php min-version="8.1" />
+        <php min-version="8.2" />
         <nextcloud min-version="27" max-version="27" />
     </dependencies>
 

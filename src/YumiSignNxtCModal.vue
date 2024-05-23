@@ -20,7 +20,7 @@
 	*
 	-->
     <div>
-        <Modal v-if="modal" size="large" @close="closeModal">
+        <Modal class="rcdevsYmsModal" v-if="modal" size="large" @close="closeModal">
             <div class="modal__content">
                 <h1>{{ $t("yumisign_nextcloud", "YumiSign for Nextcloud") }}</h1>
                 <img v-if="checkingSettings" :src="loadingImg" />
