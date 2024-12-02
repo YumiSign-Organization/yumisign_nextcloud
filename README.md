@@ -1,3 +1,5 @@
+![](https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/main/assets/YumiSign.png)
+
 # YumiSign for Nextcloud
 
 This YumiSign Plugin for Nextcloud allows users to digitally sign documents directly within the Nextcloud platform. With this plugin, you can securely sign PDFs, Word documents, and other supported file types with ease, ensuring the integrity and authenticity of your documents.
@@ -46,3 +48,13 @@ For more support and information:
 
 # Contact us
 Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.com) to purchase e-signature credits.
+
+**How to use it**
+
+You can download the application from the Nextcloud market at https://apps.nextcloud.com/apps/yumisign_nextcloud
+
+On this repository, please consult the different branches corresponding to the version of Nextcloud installed on your server.
+
+Do not hesitate to contact us at https://www.yumisign.com/contact-us
+
+![](https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/main/assets/RCDevs%20Security.png)
