@@ -1,4 +1,4 @@
-![](https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/main/assets/YumiSign.png)
+![](https://docs.rcdevs.com/pictures/logo/yumisign/nextcloud/yumisign_169x169.png)
 
 # YumiSign for Nextcloud
 
@@ -57,4 +57,4 @@ On this repository, please consult the different branches corresponding to the v
 
 Do not hesitate to contact us at https://www.yumisign.com/contact-us
 
-![](https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/main/assets/RCDevs%20Security.png)
+![](https://docs.rcdevs.com/pictures/logo/rcdevs/nextcloud/rcdevs_115x54.png)
