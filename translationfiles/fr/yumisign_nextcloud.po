@@ -1,0 +1,519 @@
+####################################################################################################
+### SETTINGS (ADMINISTRATION)
+####################################################################################################
+
+### YumiSign server settings
+	msgid	"YumiSign for Nextcloud Settings"
+	msgstr	"Paramètres de YumiSign pour Nextcloud"
+
+	msgid	"Installed version"
+	msgstr	"Version installée"
+
+	msgid	"Enter your YumiSign server settings in the fields below."
+	msgstr	"Entrez les paramètres de votre serveur YumiSign dans les champs ci-dessous."
+
+	msgid	"After each settings modification, please save your settings."
+	msgstr	"Après chaque modification des paramètres, veuillez enregistrer vos paramètres."
+
+	msgid	"YumiSign server URL"
+	msgstr	"Url du server YumiSign"
+
+	msgid	"YumiSign API key"
+	msgstr	"Clé API YumiSign"
+
+	msgid	"Client ID"
+	msgstr	"Identifiant du client"
+
+	msgid	"Client secret"
+	msgstr	"Secret du client"
+
+	msgid	"Workspace name"
+	msgstr	"Nom de l'espace de travail"
+
+	msgid	"Workspace ID"
+	msgstr	"Identifiant de l'espace de travail"
+
+
+### YumiSign server settings (placeholders)
+	# msgid	"Write YumiSign url here"
+	# msgstr	"Inscrivez l'url YumiSign"
+
+	msgid	"Get API Key from RCDevs"
+	msgstr	"Obtenir une clé API auprès de RCDevs"
+
+	msgid	"Optional, get from RCDevs"
+	msgstr	"Facultatif, obtenu auprès de RCDevs"
+
+	msgid	"Set a Workspace name"
+	msgstr	"Définissez un nom de Workspace"
+
+	msgid	"Set the Workspace ID from name"
+	msgstr	"Définissez l'identifiant du Workspace à partir du nom"
+
+	msgid	"Get API Key from YumiSign"
+	msgstr	"Récupérez la clé API à partir de l'IHM YumiSign"
+
+
+### Proxy settings
+	msgid	"Use a proxy"
+	msgstr	"Utiliser un serveur proxy"
+
+	msgid	"Proxy host"
+	msgstr	"Hôte du serveur proxy"
+
+	msgid	"Proxy port"
+	msgstr	"Port du serveur proxy"
+
+	msgid	"Proxy username"
+	msgstr	"Nom d’utilisateur du proxy"
+
+	msgid	"Proxy password"
+	msgstr	"Mot de passe du proxy"
+
+
+### Signatures settings
+	msgid	"Signatures Parameters"
+	msgstr	"Paramètres des signatures"
+
+	msgid	"Enable YumiSign signature"
+	msgstr	"Activer la signature par YumiSign"
+
+	msgid	"Enable Advanced signature"
+	msgstr	"Activer la signature de type Avancé"
+
+	msgid	"Enable Qualified signature"
+	msgstr	"Activer la signature de type Qualifiée"
+
+	msgid	"Enable Simple signature"
+	msgstr	"Activer la signature de type Simple"
+
+	msgid	"Make a signed copy of the original PDF file"
+	msgstr	"Faire une copie signée du fichier PDF original"
+
+	msgid	"Overwrite the original PDF file with its signed copy (default: time-stamped copy)"
+	msgstr	"Écraser le fichier PDF original avec sa copie signée (par défault copie horodatée)"
+
+	msgid	"Textual complement of signed file"
+	msgstr	"Complément textuel du fichier signé"
+
+	msgid	"Contract"
+	msgstr	"Contrat"
+
+
+### Cron settings
+	msgid	"Cron Parameters"
+	msgstr	"Paramètres des tâches planifiées"
+
+	msgid	"To check asynchronous signature requests, you need to define the execution frequency of the background task that checks the status of these signatures."
+	msgstr	"Pour vérifier les demandes signatures asynchrones, il faut définir la périodicité d'exécution de la tâche d'arrière-plan qui se charge de vérifier le statut ces signatures."
+
+	msgid	"Please note that for this periodicity to be honored, it is necessary to configure Nextcloud background jobs setting with 'Cron' value and to define the crontab periodicity accordingly."
+	msgstr	"Veuillez noter que pour que cette périodicité soit respectée, il est nécessaire de configurer le paramètre Nextcloud background jobs avec la valeur 'Cron' et de définir la périodicité crontab en conséquence."
+
+	msgid	"More information here"
+	msgstr	"Davantage d'information ici"
+
+	msgid	"Periodicity"
+	msgstr	"Périodicité"
+
+
+### Cron checkings (OK & KO messages)
+	msgid	"Checking Cron"
+	msgstr	"Vérification de la planification"
+
+	msgid	"The cron job is activated"
+	msgstr	"La tâche planifiée est activée"
+
+	msgid	"The cron job is activated; the last time the job ran was at %s"
+	msgstr	"La tâche planifiée est activée ; la dernière exécution du processus était à %s"
+
+	msgid	"The cron job was disabled at %s"
+	msgstr	"La tâche cron a été désactivée à %s"
+
+	msgid	"The cron job has been activated at %s"
+	msgstr	"La tâche cron a été activée à %s"
+
+### Buttons labels
+	msgid	"Test connection"
+	msgstr	"Tester la connexion"
+
+	msgid	"Save"
+	msgstr	"Enregistrer"
+
+	msgid	"Re-enable cron"
+	msgstr	"Réactiver la planification"
+
+
+### Misc messages
+	msgid	"Your settings have been saved succesfully"
+	msgstr	"Vos paramètres ont été enregistrés avec succès"
+
+	msgid	"Do not forget to save your settings!"
+	msgstr	"N'oubliez pas de sauver vos paramètres !"
+
+
+
+
+####################################################################################################
+### SETTINGS (PERSONAL)
+####################################################################################################
+
+	msgid	"YumiSign for Nextcloud Personal Settings"
+	msgstr	"Paramètres Personnels de YumiSign pour Nextcloud"
+
+	msgid	"Login to YumiSign to send signature requests from your own account"
+	msgstr	"Connectez-vous à YumiSign pour envoyer des demandes de signatures à partir de votre propre compte"
+
+	msgid	"Email address"
+	msgstr	"Adresse email"
+
+	msgid	"Email used to connect to YumiSign"
+	msgstr	"Email utilisé pour se connecter sur YumiSign"
+
+	msgid	"Associated password"
+	msgstr	"Mot de passe associé"
+
+	#	msgid	"Customize signed files path"
+	#	msgstr	"Personnalisez le dossier des fichiers signés"
+
+	#	msgid	"Choose your own path for signed files; by default/empty, same path than original file to sign"
+	#	msgstr	"Choisissez votre propre dossier pour les fichiers signés ; par défaut/vide, le même dossier que le fichier original à signer"
+
+	#	msgid	"Personal path"
+	#	msgstr	"Dossier personnel"
+
+	#	msgid	"Write here your path"
+	#	msgstr	"Saisissez ici votre dossier"
+
+### Settings (Personal) buttons
+	msgid	"Connection"
+	msgstr	"Connexion"
+
+### Settings (Personal) messages
+	msgstr	"Empty email address forbidden"
+	msgid	"Incorrect email format"
+
+	msgid	"Format d'email incorrect"
+	msgstr	"Adresse email vide interdite"
+
+	msgstr	"Empty password forbidden"
+	msgstr	"Mot de passe vide interdit"
+
+	msgstr	"Not managed exception"
+	msgstr	"Exception non gérée"
+
+
+
+
+
+
+####################################################################################################
+### SIGNATURES MODAL FORM
+####################################################################################################
+
+### PRE MENU
+	msgid	"Sign with YumiSign"
+	msgstr	"Signer avec YumiSign"
+
+### Header
+	msgid	"YumiSign for Nextcloud"
+	msgstr	"YumiSign pour Nextcloud"
+
+	msgid	"Sign with YumiSign for Nextcloud the file"
+	msgstr	"Signer avec YumiSign pour Nextcloud le fichier"
+
+	msgid	"Self-signed"
+	msgstr	"Auto-signé"
+
+	msgid	"Signature by a Nextcloud user"
+	msgstr	"Signature par un utilisateur Nextcloud"
+
+	msgid	"Signature by email"
+	msgstr	"Signature par e-mail"
+
+	msgid	"For internal and B2B documents"
+	msgstr	"Pour les documents internes et B2B"
+
+	msgid	"For legal documents"
+	msgstr	"Pour les documents juridiques"
+
+	msgid	"For most documents"
+	msgstr	"Pour la plupart des documents"
+
+### Placeholders
+	msgid	"Search users"
+	msgstr	"Rechercher les utilisateurs"
+
+	msgid	"Emails separated by commas"
+	msgstr	"Emails séparés par des virgules"
+
+### Misc messages
+	msgid	"Error: "
+	msgstr	"Erreur : "
+
+	msgid	"Your email is not defined; self signature is disabled"
+	msgstr	"Votre email n'est pas défini ; l'autosignature est désactivée"
+
+	msgid	"There was an error saving settings"
+	msgstr	"Une erreur s’est produite lors de l’enregistrement des paramètres"
+
+	msgid	"All signature modes are disabled; you have to enable minimum one mode in this application settings prior to sign any document"
+	msgstr	"Tous les modes de signature sont désactivés ; vous devez activer au moins un mode dans les paramètres de cette application avant de signer un document"
+
+### Buttons labels
+	msgid	"Advanced signature"
+	msgstr	"Signature avancée"
+
+	msgid	"Qualified signature"
+	msgstr	"Signature qualifiée"
+
+	msgid	"Simple signature"
+	msgstr	"Signature simple"
+
+	msgid	"Close"
+	msgstr	"Fermer"
+
+	msgid	"Send"
+	msgstr	"Envoyer"
+
+
+
+
+####################################################################################################
+### PENDING, ISSUES & SUCCESSES
+####################################################################################################
+
+### Header
+	msgid	"My Projects"
+	msgstr	"Mes Projets"
+
+	msgid	"Here you can manage all your requests"
+	msgstr	"Ici, vous pouvez gérer toutes vos demandes"
+
+	msgid	"Pending"
+	msgstr	"En attente"
+
+	msgid	"Completed"
+	msgstr	"Complétées"
+
+	msgid	"Declined"
+	msgstr	"Rejetées"
+
+	msgid	"Expired"
+	msgstr	"Expirées"
+
+	msgid	"Failed"
+	msgstr	"En échec"
+
+	msgid	"Document name"
+	msgstr	"Nom du document"
+
+	msgid	"Creation date"
+	msgstr	"Date de création"
+
+	msgid	"Expiration date"
+	msgstr	"Date d'expiration"
+
+	msgid	"Changed status"
+	msgstr	"Statut modifié"
+
+	msgid	"Recipient"
+	msgstr	"Destinataire"
+
+	msgid	"File"
+	msgstr	"Fichier"
+
+	msgid	"Request status"
+	msgstr	"Statut de la demande"
+
+	msgid	"error"
+	msgstr	"échec"
+
+	msgid	"signed"
+	msgstr	"signé"
+
+### Cancellation & deletion messages
+	msgid	"Retrieving..."
+	msgstr	"Récupération..."
+
+	msgid	"Cancel pending signature"
+	msgstr	"Annulation d'une demande en attente"
+
+	msgid	"Are you sure you want to cancel this signature request ?"
+	msgstr	"Êtes-vous sûr de vouloir annuler cette demande de signature ?"
+
+	msgid	"Canceling..."
+	msgstr	"Annulation..."
+
+	msgid	"Delete failed transaction"
+	msgstr	"Supprimer la transaction en échec"
+
+	msgid	"Are you sure you want to delete this signature issue ?"
+	msgstr	"Êtes-vous sûr de vouloir supprimer la signature en échec"
+
+	msgid	"Delete successful transaction"
+	msgstr	"Supprimer la transaction réussie"
+
+	msgid	"Are you sure you want to delete this signature success ?"
+	msgstr	"Êtes-vous sûr de vouloir supprimer la signature réussie"
+
+	msgid	"Deleting..."
+	msgstr	"Suppression..."
+
+	msgid	"Deletion process failed"
+	msgstr	"Suppression échouée"
+
+	msgid	"There are currently no pending signature requests"
+	msgstr	"Il n’y a actuellement aucune demande de signature en attente"
+
+	msgid	"No pending signature requests"
+	msgstr	"Aucune demande de signature en attente"
+
+	msgid	"No signature requests issues"
+	msgstr	"Aucune demande de signature en échec"
+
+	msgid	"There are currently no signature requests issues"
+	msgstr	"Il n’y a actuellement aucune demande de signature en échec"
+
+	msgid	"No successful signature requests"
+	msgstr	"Aucune demande de signature réussie"
+
+	msgid	"There are currently no successful signature requests"
+	msgstr	"Il n’y a actuellement aucune demande de signature réussie"
+
+	msgid	"Request cancelled"
+	msgstr	"Demande annulée"
+
+### Cancellation & deletion buttons
+	msgid	"Cancel"
+	msgstr	"Annuler"
+
+	msgid	"Delete"
+	msgstr	"Supprimer"
+
+	msgid	"Go back"
+	msgstr	"Retour"
+
+### Navigation
+	msgid	"Previous"
+	msgstr	"Précédent"
+
+	msgid	"Next"
+	msgstr	"Suivant"
+
+
+
+
+####################################################################################################
+### PUSH NOTIFICATION
+####################################################################################################
+
+	msgid	"YumiSign request {status}"
+	msgstr	"Demande YumiSign {status}"
+
+	msgid	"You have been requested to sign a document"
+	msgstr	"Vous avez été invité à signer un document"
+
+	msgid	"YumiSign error; contact your administrator"
+	msgstr	"Erreur YumiSign ; contactez votre administrateur"
+
+
+
+
+####################################################################################################
+### TO CHECK
+####################################################################################################
+
+	msgid	"Qualified"
+	msgstr	"Qualifié"
+
+
+	msgid	"Date"
+	msgstr	"Date"
+
+
+
+####################################################################################################
+### KEEP FOR LATER
+####################################################################################################
+
+msgid	"Completion check of pending asynchronous signatures"
+msgstr	"Vérification de l’achèvement des signatures asynchrones en attente"
+
+msgid	"No pending signature requests"
+msgstr	"Aucune demande de signature en attente"
+
+msgid	"Close"
+msgstr	"Fermer"
+
+msgid	"You have to enter the YumiSign server URL in the YumiSign for Nextcloud settings prior to sign any document"
+msgstr	"Vous devez entrer l’URL du serveur YumiSign dans les paramètres de YumiSign pour Nextcloud avant de signer un document."
+
+msgid	"Digital signature"
+msgstr	"Signature numérique"
+
+msgid	"Recipient status"
+msgstr	"Statut du destinataire"
+
+msgid	"Check Name/ID"
+msgstr	"Vérifier Nom/Id"
+
+msgid	"Retrieve ID"
+msgstr	"Récupérer l'identifiant"
+
+msgid	"Verify name"
+msgstr	"Vérifier le nom"
+
+msgid	"Delete YumiSign request"
+msgstr	"Supprimer la demande YumiSign"
+
+msgid	"Choose workspace ID"
+msgstr	"Choisissez l'identifiant du workspace"
+
+msgid	"The given workspace name corresponds to several Ids. Please click on the correct ID."
+msgstr	"Le nom du workspace donné correspond à plusieurs identifiants. Merci de cliquer sur l'identifiant valide."
+
+msgid	"Choose this ID:"
+msgstr	"Choississez cet identifiant :"
+
+msgid	"Write one or several emails separated by semicolons"
+msgstr	"Inscrivez un ou plusieurs e-mails séparés par des points-virgules"
+
+msgid	"Write a user Id"
+msgstr	"Inscrivez un identifiant utilisateur"
+
+msgid	"You have selected:"
+msgstr	"Vous avez sélectionné :"
+
+msgid	"Enter your Proxy server settings in the fields below."
+msgstr	"Entrez les paramètres de votre serveur Proxy dans les champs ci-dessous."
+
+msgid	"Checking process failed at %s"
+msgstr	"Le processus de vérification a échoué à %s"
+
+msgid	"Reset cron"
+msgstr	"Réactiver cron"
+
+msgid	"approved"
+msgstr	"approuvée"
+
+msgid	"canceled"
+msgstr	"annulée"
+
+msgid	"declined"
+msgstr	"rejetée"
+
+msgid	"expired"
+msgstr	"expirée"
+
+msgid	"not applicable"
+msgstr	"non applicable"
+
+msgid	"not found"
+msgstr	"non trouvée"
+
+msgid	"started"
+msgstr	"débutée"
+
+msgid	"Define the execution periodicity of the background job that checks for completed signature requests."
+msgstr	"Définir la périodicité d'exécution de la tâche d'arrière-plan qui vérifie si les demandes de signature sont terminées."

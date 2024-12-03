@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<api-key-name>X-YumiSign-Api-Key</api-key-name>
+	<app-main-logo>YumiSign.svg</app-main-logo>
+	<app-short-name>YumiSign</app-short-name>
+	<items-per-page>10</items-per-page>
+	<name-signed>YMSSigned</name-signed>
+	<table-name-sessions>yumisign_nxtc_sess</table-name-sessions>
+	<token-name>Authorization: Bearer</token-name>
+
+	<!-- URLS -->
+	<url-app>https://app.yumisign.com:443/api/v1/</url-app>
+	<url-app-no-api>https://app.yumisign.com:443/</url-app-no-api>
+	<url-archive>/storage/archive/</url-archive>
+	<url-cancel>/workspaces/%s/workflows/%s/cancel</url-cancel>
+	<url-debrief>/workspaces/%s/workflows/%s</url-debrief>
+	<url-envelopes>/envelopes?%s</url-envelopes>
+	<url-integ-apps-authorize>/integration-apps/authorize</url-integ-apps-authorize>
+	<url-open-authorization>/OAuth/v2/access</url-open-authorization>
+	<url-preferences>/workspaces/%s/workflows/%s/preferences</url-preferences>
+	<url-recipients>/workspaces/%s/workflows/%s/roles</url-recipients>
+	<url-session>/workspaces/%s/workflows/%s/session</url-session>
+	<url-start-workflow>/workspaces/%s/workflows/%s/start</url-start-workflow>
+	<url-steps>/workspaces/%s/workflows/%s/steps</url-steps>
+	<url-workflows>/workspaces/%s/workflows</url-workflows>
+	<url-workspaces-id>/workspaces/%s</url-workspaces-id>
+	<url-workspaces>/workspaces</url-workspaces>
+	<!-- STATUS -->
+	<status-pending>APPROVED,STARTED</status-pending>
+</config>
