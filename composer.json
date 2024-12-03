@@ -6,7 +6,8 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"OCA\\YumiSignNxtC\\": "lib/"
+			"OCA\\YumiSignNxtC\\": "lib/",
+			"OCA\\RCDevs\\": "rcdevsBundle/"
 		}
 	},
 	"config": {

@@ -13,45 +13,36 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
  */
-
-declare(strict_types=1);
 
 namespace OCA\YumiSignNxtC\Controller;
 
 use OCA\YumiSignNxtC\AppInfo\Application;
-use OCA\YumiSignNxtC\Config;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Services\IInitialState;
 use OCP\HintException;
+use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
 
 class PageController extends Controller
 {
-	private IInitialState $initialState;
-	private IUserSession $userSession;
-	private Config $config;
-
 	public function __construct(
-		string $appName,
-		IRequest $request,
-		IInitialState $initialState,
-		IUserSession $userSession,
-		Config $config
+		IRequest							$request,
+		private		IConfig					$config,
+		private		IInitialState			$initialState,
+		private		IUserSession			$userSession,
+		string								$appName,
 	) {
 		parent::__construct($appName, $request);
-		$this->initialState = $initialState;
-		$this->userSession = $userSession;
-		$this->config = $config;
 	}
 
 	/**
@@ -63,9 +54,9 @@ class PageController extends Controller
 	 */
 	public function index(): Response
 	{
-
-		$response = new TemplateResponse(Application::APP_ID, 'index', [
-			'app' => Application::APP_ID,
+		$appId = Application::APP_ID();
+		$response = new TemplateResponse($appId, 'index', [
+			'app' => $appId,
 			'id-app-content' => '#app-content-vue',
 			'id-app-navigation' => '#app-navigation-vue',
 		]);

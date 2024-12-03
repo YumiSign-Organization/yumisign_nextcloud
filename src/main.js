@@ -11,16 +11,16 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
  */
 
 import Vue from 'vue'
-import Vuex from 'vuex'
+// import Vuex from 'vuex'
 import App from './App.vue'
 import { Tooltip } from '@nextcloud/vue'
 
@@ -35,7 +35,7 @@ Vue.prototype.OCP = OCP
 
 Vue.directive('tooltip', Tooltip)
 
-Vue.use(Vuex)
+// Vue.use(Vuex)
 
 export default new Vue({
 	el: '#content',

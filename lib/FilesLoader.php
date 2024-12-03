@@ -13,20 +13,17 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
  */
-
-declare(strict_types=1);
 
 namespace OCA\YumiSignNxtC;
 
 use OCA\YumiSignNxtC\AppInfo\Application;
-use OCA\Files\Event\LoadSidebar;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Services\IInitialState;
 use OCP\Collaboration\Resources\LoadAdditionalScriptsEvent;
@@ -57,7 +54,6 @@ class FilesLoader implements IEventListener
 	public static function register(IEventDispatcher $dispatcher): void
 	{
 		$dispatcher->addServiceListener(LoadAdditionalScriptsEvent::class, self::class);
-		// $dispatcher->addServiceListener(LoadSidebar::class, self::class);
 	}
 
 	public function handle(Event $event): void
@@ -67,16 +63,15 @@ class FilesLoader implements IEventListener
 		}
 	}
 
-
 	private function handleAdditionalScripts(LoadAdditionalScriptsEvent $event): void
 	{
-		if (!$this->appManager->isEnabledForUser(Application::APP_ID)) {
+		$appId = Application::APP_ID();
+
+		if (!$this->appManager->isEnabledForUser($appId)) {
 			return;
 		}
 
-
-		// $this->setupInitialState($server);
-		Util::addScript(Application::APP_ID, Application::APP_ID . '-loader');
-		Util::addStyle(Application::APP_ID, 'icons');
+		Util::addScript($appId, $appId . '-loader');
+		Util::addStyle($appId, 'icons');
 	}
 }

@@ -13,43 +13,30 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
  */
 
 namespace OCA\YumiSignNxtC\Controller;
 
-use OC\User\Backend;
-use \OCP\AppFramework\Http\RedirectResponse;
-use Exception;
 use OC\AppFramework\Http;
 use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
-use OCA\YumiSignNxtC\Db\SignSession;
-use OCA\YumiSignNxtC\Db\SignSessionMapper;
-use OCA\YumiSignNxtC\Service\CurlResponse;
-use OCA\YumiSignNxtC\Service\SignService;
-use OCA\YumiSignNxtC\Utility\Utility;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\DataResponse;
-use OCP\AppFramework\Http\JSONResponse;
-use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Collaboration\Collaborators\ISearch;
 use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\IUserSession;
-use OCP\Notification\IManager;
 use OCP\Share\IShare;
-use OCP\Util;
-use Psr\Log\LoggerInterface;
 
 class UserController extends Controller
 {
-
+	//	TODO	Add exceptions management
 	/** @var IUserManager */
 
 	public function __construct(
@@ -57,7 +44,6 @@ class UserController extends Controller
 		$AppName,
 		IRequest $request,
 		private string $userId,
-		private LoggerInterface $logger,
 		private IUserManager $userManager,
 		private ISearch $search,
 		private IUserSession $userSession
@@ -115,7 +101,7 @@ class UserController extends Controller
 
 		$limit = 10;
 		$offset = 0;
-		$lookup = false;  // Don't use lookup server.
+		$lookup = false;	// Don't use lookup server.
 		[$result, $hasMoreResults] = $this->search->search($search, $shareTypes, $lookup, $limit, $offset);
 		if ($type === 'user') {
 			// Filter out users not allowed to use the app.
@@ -130,7 +116,7 @@ class UserController extends Controller
 					}
 					$userCache[$userId] = $user;
 				}
-				return $this->appManager->isEnabledForUser(YumiSignApp::APP_ID, $user);
+				return $this->appManager->isEnabledForUser(YumiSignApp::APP_ID(), $user);
 			};
 
 			$totalResults = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);

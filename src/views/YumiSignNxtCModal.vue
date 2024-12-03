@@ -11,557 +11,1277 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
 -->
 
 <template>
-	<NcModal class="rcdevsYmsModal" :show.sync="modal" @close="closeModal" :outTransition="true" :aria-label="t(appName, 'Sign with YumiSign')">
-		<div ref="ymsModalForm" class="ymsModalContent">
-			<h1 class="ymsModalTitle">
-				{{ t(appName, 'YumiSign for Nextcloud') }}
-			</h1>
+	<NcModal class="rcdevsModalYMS" :show.sync="modal" @close="closeModal" :outTransition="true" :aria-label="ncModalAriaLabel">
+		<rcdevsModalContent ref="rcdevsModalFormYMS">
+			<rcdevsLogo ref="rcdevsLogoYMS">
+				<svg id="YumiSignLogo" :data-src="ui.pictures.applicationLogo"></svg>
+			</rcdevsLogo>
 
-			<div v-if="isSettingKO()" id="errorSettings" class="alert alertDanger">
-				{{ ui.messages.warningServer }}
-			</div>
+			<rcdevsModalMainContainer>
+				<rcdevsModalHeader>
+					<rcdevsRow class="chosenFile">
+						<rcdevsItem class="filenameLabel">
+							{{ file.message }}
+						</rcdevsItem>
+					</rcdevsRow>
 
-			<ymsModalMainContainer v-if="isSettingOK()">
-				<div v-if="!success">
-					<img :src="ui.pictures.mobileSigningImg" style="max-height: 200px" />
-				</div>
+					<rcdevsRow class="chosenFile">
+						<rcdevsItem class="filenameValue">
+							{{ file.basename }}
+						</rcdevsItem>
+					</rcdevsRow>
+				</rcdevsModalHeader>
 
-				<greenTick v-if="isSuccesNotSimpleTypeSignature()">
-					<span> &#10003; </span>
-				</greenTick>
+				<rcdevsSettingsKO v-if="actionSign && disabledSign && enabledApp.checked" class="alert alertDanger disabledAction">
+					{{ ui.messages.warning.disabled.sign }}
+				</rcdevsSettingsKO>
 
-				<div class="chosenFile">
-					<span>
-						{{ ui.messages.filenameMessage }}
-					</span>
-					<span class="filename">
-						{{ getBasename() }}
-					</span>
-				</div>
-
-				<p v-if="error" class="error">
-					{{ errorMessage }}
-				</p>
-
-				<br />
-
-				<recipientsChoices v-if="!isTransactionInProgress()">
-					<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.self)">
-						<NcCheckboxRadioSwitch v-if="!selfDisabled" :checked.sync="recipientType" :value="constantes.self" :disabled="selfDisabled" name="ymsRecipientRadio" type="radio">
-							{{ t(appName, 'Self-signature') }}
-						</NcCheckboxRadioSwitch>
-						<DisplaySelfEmail>
-							<span>{{ currentUserFullData }}</span>
-						</DisplaySelfEmail>
-					</recipientsSignleChoice>
-
-					<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.nextcloud)">
-						<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.nextcloud" name="ymsRecipientRadio" type="radio">
-							{{ t(appName, 'Signature by a Nextcloud user') }}
-						</NcCheckboxRadioSwitch>
-						<SelectNextcloudUsers>
-							<NcTextField ref="userField" v-observe-visibility="userVisibilityChanged" :disabled="shareLoading" :value.sync="user" type="text" :placeholder="t(appName, 'Search users')" trailing-button-icon="close" :trailing-button-label="cancelSearchLabel" :show-trailing-button="isSearchingUser" @trailing-button-click="abortUserSearch" @input="handleUserInput">
-								<Magnify :size="16" />
-							</NcTextField>
-							<SearchResults v-if="user !== ''" :search-text="user" :search-results="userResults" :entries-loading="usersLoading" :no-results="noUserResults" :scrollable="true" :selectable="true" @click="addUser" />
-						</SelectNextcloudUsers>
-					</recipientsSignleChoice>
-
-					<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.external)">
-						<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.external" name="ymsRecipientRadio" type="radio">
-							{{ t(appName, 'Signature by email') }}
-						</NcCheckboxRadioSwitch>
-						<InputUsersEmails>
-							<input v-model="externalUserEmail" type="text" :placeholder="`${ui.messages.placeHolderEmail}`" />
-						</InputUsersEmails>
-					</recipientsSignleChoice>
-				</recipientsChoices>
-
-				<div v-if="isRequesting()">
+				<rcdevsWaitingOcs v-if="!rcdevsSettings.checked || !enabledApp.checked || !signTypes.checked">
 					<img :src="ui.pictures.loadingImg" />
-				</div>
-			</ymsModalMainContainer>
+				</rcdevsWaitingOcs>
 
-			<ymsModalFooter>
-				<button v-if="isSettingKO()" type="button" @click="closeModal" class="closeModal">
-					{{ t(appName, 'Close') }}
-				</button>
-				<button v-if="isSettingOK()" type="button" @click="submitSignature" class="submitSignature">
-					{{ t(appName, 'Digital signature') }}
-				</button>
-			</ymsModalFooter>
-		</div>
+				<rcdevsSignProcess v-if="enabledSign && actionSign">
+					<rcdevsRecipientsChoices v-if="!axiosSrvRequest.inProgress && actionSign && !file.signed">
+						<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.self.label)">
+							<NcCheckboxRadioSwitch v-if="!selfDisabled" :checked.sync="recipientType" :value="constantes.self.label" :disabled="selfDisabled" name="rcdevsRecipientRadioYMS" type="radio">
+								{{ constantes.self.value }}
+							</NcCheckboxRadioSwitch>
+							<DisplaySelfEmail>
+								<input type="text" name="" :value="currentUserFullData" disabled />
+							</DisplaySelfEmail>
+						</recipientsSignleChoice>
+
+						<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.nextcloud)">
+							<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.nextcloud" name="rcdevsRecipientRadioYMS" type="radio">
+								{{ ui.messages.filenameMessage.nextcloudUser }}
+							</NcCheckboxRadioSwitch>
+							<SelectNextcloudUsers>
+								<NcSelect id="rcdevsUsersFiltered" v-bind="usersListProps" v-model="usersListProps.value" @search="search" :no-wrap="true" />
+								<!-- <SearchResults id="rcdevsSearchResultsYMS" v-if="user !== ''" :search-text="user" :search-results="userResults" :entries-loading="usersLoading" :no-results="noUserResults" :scrollable="true" :selectable="true" @click="addUser" /> -->
+							</SelectNextcloudUsers>
+						</recipientsSignleChoice>
+
+						<recipientsSignleChoice v-on:click="changeNcSelectvalue(constantes.email)">
+							<NcCheckboxRadioSwitch :checked.sync="recipientType" :value="constantes.email" name="rcdevsRecipientRadioYMS" type="radio">
+								{{ ui.messages.filenameMessage.email }}
+							</NcCheckboxRadioSwitch>
+							<InputUsersEmails>
+								<input id="rcdevsEmailsList" ref="emailsList" v-model="emailsList" type="text" :name="rcdevsEmailsList" :placeholder="`${ui.messages.placeHolderEmailsList}`" />
+							</InputUsersEmails>
+						</recipientsSignleChoice>
+					</rcdevsRecipientsChoices>
+
+					<rcdevsRow id="rcdevsMessageBanner">
+						<rcdevsInProgress v-if="axiosSrvRequest.inProgress">
+							<img :src="ui.pictures.loadingImg" />
+						</rcdevsInProgress>
+
+						<rcdevsSuccess v-if="axiosSrvRequest.success">
+							<rcdevsMessageBanner type="success">
+								<rcdevsIconMessage type="success" />
+								<rcdevsCuteMessage>
+									{{ axiosSrvRequest.message }}
+								</rcdevsCuteMessage>
+							</rcdevsMessageBanner>
+							<rcdevsSuccessTick v-if="axiosSrvRequest.success && file.signed" class="rcdevsSuccessTick">
+								<img id="rcdevsSuccessTick" :src="ui.pictures.successTick" />
+							</rcdevsSuccessTick>
+						</rcdevsSuccess>
+
+						<rcdevsError v-if="axiosSrvRequest.error">
+							<rcdevsMessageBanner type="error">
+								<rcdevsIconMessage type="error" />
+								<rcdevsCuteMessage>
+									{{ axiosSrvRequest.message }}
+								</rcdevsCuteMessage>
+							</rcdevsMessageBanner>
+						</rcdevsError>
+					</rcdevsRow>
+				</rcdevsSignProcess>
+
+				<rcdevsModalFooter class="rcdevsModalFooterYMS">
+					<rcdevsRow>
+						<hr class="rcdevsSeparator" />
+					</rcdevsRow>
+					<rcdevsRow v-if="enabledSign && !file.signed">
+						<rcdevsSignaturesTypes>
+							<!-- <rcdevsSignType v-if="enabledSign && signTypes.standard.enabled" :disabled="axiosSrvRequest.inProgress"> -->
+							<rcdevsSignType v-bind:class="disabledSign || !signTypes.standard.enabled || signatureType !== constantes.signType.standard.value ? 'signDisabled' : ''">
+								<NcCheckboxRadioSwitch :checked.sync="signatureType" :disabled="axiosSrvRequest.inProgress || disabledSign || !signTypes.standard.enabled" :value="constantes.signType.standard.value" name="rcdevsSignatureTypeRadioYMS" type="radio">
+									<rcdevsItemsGrp>
+										<rcdevsItem class="rcdevsLabel">{{ signTypes.standard.label }}</rcdevsItem>
+										<rcdevsItem class="rcdevsAdditional">{{ signTypes.standard.additional }}</rcdevsItem>
+									</rcdevsItemsGrp>
+								</NcCheckboxRadioSwitch>
+							</rcdevsSignType>
+
+							<!-- <rcdevsSignType v-if="enabledSign && signTypes.advanced.enabled" :disabled="axiosSrvRequest.inProgress"> -->
+							<rcdevsSignType v-bind:class="disabledSign || !signTypes.advanced.enabled || signatureType !== constantes.signType.advanced.value ? 'signDisabled' : ''">
+								<NcCheckboxRadioSwitch :checked.sync="signatureType" :disabled="axiosSrvRequest.inProgress || disabledSign || !signTypes.advanced.enabled" :value="constantes.signType.advanced.value" name="rcdevsSignatureTypeRadioYMS" type="radio">
+									<rcdevsItemsGrp>
+										<rcdevsItem class="rcdevsLabel">{{ signTypes.advanced.label }}</rcdevsItem>
+										<rcdevsItem class="rcdevsAdditional">{{ signTypes.advanced.additional }}</rcdevsItem>
+									</rcdevsItemsGrp>
+								</NcCheckboxRadioSwitch>
+							</rcdevsSignType>
+
+							<!-- <rcdevsSignType v-if="enabledSign && signTypes.qualified.enabled" :disabled="axiosSrvRequest.inProgress"> -->
+							<rcdevsSignType v-bind:class="disabledSign || !signTypes.qualified.enabled || signatureType !== constantes.signType.qualified.value ? 'signDisabled' : ''">
+								<NcCheckboxRadioSwitch :checked.sync="signatureType" :disabled="axiosSrvRequest.inProgress || disabledSign || !signTypes.qualified.enabled" :value="constantes.signType.qualified.value" name="rcdevsSignatureTypeRadioYMS" type="radio">
+									<rcdevsItemsGrp>
+										<rcdevsItem class="rcdevsLabel">{{ signTypes.qualified.label }}</rcdevsItem>
+										<rcdevsItem class="rcdevsAdditional">{{ signTypes.qualified.additional }}</rcdevsItem>
+									</rcdevsItemsGrp>
+								</NcCheckboxRadioSwitch>
+							</rcdevsSignType>
+						</rcdevsSignaturesTypes>
+					</rcdevsRow>
+					<rcdevsRow class="rcdevsButtonsYMS">
+						<button type="button" @click="closeModal" class="closeModal">
+							{{ ui.button.close }}
+						</button>
+
+						<button type="button" @click="runTransactionSignature()" class="actionModal">
+							{{ ui.button.send }}
+						</button>
+					</rcdevsRow>
+				</rcdevsModalFooter>
+			</rcdevsModalMainContainer>
+		</rcdevsModalContent>
 	</NcModal>
 </template>
 
+<style>
+@import '../styles/yumisignRoot.css';
+@import '../styles/rcdevsStyle.css';
+@import '../styles/rcdevsUtility.css';
+@import '../styles/yumisignStyle.css';
+</style>
+
 <script>
-import {generateFilePath, generateOcsUrl, generateUrl} from '@nextcloud/router';
+import {appName, modalName, signAction, signatureLabel, signatureLabelFull, uiTitleSign} from '../javascript/config.js';
+import {emit} from '@nextcloud/event-bus';
+import {File, Permission} from '@nextcloud/files';
+import {generateFilePath, generateRemoteUrl, generateUrl} from '@nextcloud/router';
+import {getBasename, getOcsUrl, getT, isEmail, isEnabled, isIssueResponse, isValidResponse, log} from '../javascript/utility';
+import {getCurrentUser} from '@nextcloud/auth';
 import axios from '@nextcloud/axios';
+import debounce from 'debounce';
 import ListItemIcon from '@nextcloud/vue/dist/Components/NcListItemIcon.js';
 import NcCheckboxRadioSwitch from '@nextcloud/vue/dist/Components/NcCheckboxRadioSwitch.js';
 import NcModal from '@nextcloud/vue/dist/Components/NcModal.js';
 import NcSelect from '@nextcloud/vue/dist/Components/NcSelect.js';
-import '../styles/ymsStyle.css';
-import {appName, baseUrl} from '../config.js';
-import debounce from 'debounce';
 import NcTextField from '@nextcloud/vue/dist/Components/NcTextField.js';
-import SearchResults from '../components/SearchResults.vue';
+import SearchResults from '../components/Search/SearchResults.vue';
 
 export default {
-	name: 'YumiSignNxtCModal',
+	name: modalName,
 	components: {
-		NcModal,
-		NcCheckboxRadioSwitch,
-		NcSelect,
 		ListItemIcon,
+		NcCheckboxRadioSwitch,
+		NcModal,
+		NcSelect,
 		NcTextField,
 		SearchResults,
 	},
 
 	data() {
+		this.apis = [];
+		this.apis.settingsCheck = '/settings/check';
+		this.apis.settingsCheckTypes = '/settings/check/types';
+		this.apis.settingsCheckApp = '/settings/check/app';
+		this.apis.signLocalAsync = '/sign/local/async';
+		this.apis.userEmail = '/user/email';
+		this.apis.userId = '/user/id';
+		this.apis.usersAll = '/users/all';
+
 		this.constantes = [];
-		this.constantes.self = 'self';
+		this.constantes.self = [];
+		this.constantes.self.label = 'self';
+		this.constantes.self.value = getT('Self-signed');
 		this.constantes.nextcloud = 'nextcloud';
-		this.constantes.external = 'external';
+		this.constantes.email = 'email';
+
+		this.constantes.signType = [];
+		// Advanced
+		this.constantes.signType.advanced = [];
+		this.constantes.signType.advanced.additional = getT('For internal and B2B documents');
+		this.constantes.signType.advanced.label = getT('Advanced signature');
+		this.constantes.signType.advanced.value = 'advanced';
+		// Qualified
+		this.constantes.signType.qualified = [];
+		this.constantes.signType.qualified.additional = getT('For legal documents');
+		this.constantes.signType.qualified.label = getT('Qualified signature');
+		this.constantes.signType.qualified.value = 'qualified';
+		// Standard
+		this.constantes.signType.standard = [];
+		this.constantes.signType.standard.additional = getT('For most documents');
+		this.constantes.signType.standard.label = getT('Standard signature');
+		this.constantes.signType.standard.value = 'standard';
 
 		this.ui = [];
+
+		this.ui.axios = [
+			{
+				requestCancelled: getT('Transaction canceled'),
+			},
+		];
+
+		this.ui.button = [];
+		this.ui.button.close = getT('Close');
+		this.ui.button.send = getT('Send');
+
 		this.ui.messages = [];
+		this.ui.messages.filenameMessage = [];
+		this.ui.messages.filenameMessage.email = getT('Signature by email');
+		this.ui.messages.filenameMessage.nextcloudUser = getT('Signature by a Nextcloud user');
+		this.ui.messages.filenameMessage.searchUsers = getT('Search users');
+		this.ui.messages.filenameMessage.sign = getT(signatureLabelFull);
+		this.ui.messages.placeHolderEmailsList = getT('Emails separated by commas');
+		this.ui.messages.warning = [];
+		this.ui.messages.warning.disabled = [];
+		this.ui.messages.warning.disabled.sign = getT('All signature modes are disabled; you have to enable minimum one mode in this application settings prior to sign any document');
+
 		this.ui.pictures = [];
-
-		this.ui.messages.filenameMessage = t(appName, 'Digital signature of file');
-		this.ui.messages.placeHolderUser = t(appName, 'Write a user Id');
-		this.ui.messages.placeHolderEmail = t(appName, 'Write one or several emails separated by semicolons');
-		this.ui.messages.warningServer = t(appName, 'You have to enter the YumiSign server URL in the YumiSign for Nextcloud settings prior to sign any document');
-
-		this.ui.pictures.mobileSigningImg = generateFilePath(appName, '', 'img/') + 'mobile-signing.png';
+		this.ui.pictures.mobileSigningImg = generateFilePath(appName, '', 'img/') + 'mobileSigning.png';
 		this.ui.pictures.loadingImg = generateFilePath('core', '', 'img/') + 'loading.gif';
+		this.ui.pictures.applicationLogo = generateFilePath(appName, '', 'img/') + 'applicationLogo.svg';
+		this.ui.pictures.separator = generateFilePath(appName, '', 'img/') + 'separator.svg';
+		this.ui.pictures.successTick = generateFilePath(appName, '', 'img/') + 'successTick.svg';
 
-		this.selfDisabled = false;
-		this.currentUserFullData = '';
+		this.ui.scripts = [];
+		this.ui.scripts.svgLoader = generateFilePath(appName, '', 'javascript/') + 'svg-loader.min.js';
+
+		this.ui.title = [
+			{
+				chosen: '',
+				sign: uiTitleSign,
+			},
+		];
+
 		this.currentUser = {};
+		this.currentUserFullData = '';
+		this.selfDisabled = false;
 
 		return {
+			fileList: [],
+			ncModalAriaLabel: '',
+
 			noUserResults: false,
 			usersLoading: false,
-			userResults: {},
+			userResults: [],
 			user: '',
 
-			appName,
-			chosenFile: null,
-			modal: false,
-			checkingSettings: true,
-			requesting: false,
-			success: false,
-			error: false,
-			errorMessage: '',
-			source: null,
-			ymsSettingsChecked: false,
-			ymsSettings: false,
-			recipientType: '',
-			selfEmail: '',
-			localUser: [],
-			externalUserEmail: '',
-			formattedOptions: [],
-			designerUrl: '',
-			optionsSigType: [
-				{label: t(appName, 'Simple'), value: 'simple'},
-				{label: t(appName, 'Qualified'), value: 'qualified'},
-			],
-			signatureTypeSelected: 'simple', // Setting initial value
-			selectArray: [
+			actionSign: false,
+			disabledSign: true,
+			enabledSign: false,
+			file: [
 				{
-					title: 'User select',
-					props: {
-						inputId: Math.floor(Math.random() * 100),
-						userSelect: true,
-						options: [{}],
-					},
+					message: '',
+					signed: false,
+					basename: getBasename(this.chosenFile),
 				},
 			],
+			filenameMessage: '',
+
+			enabledApp: {
+				checked: false,
+				sign: false,
+			},
+			rcdevsSettings: {
+				checked: false,
+				validated: false,
+			},
+			signTypes: [],
+
+			settingKO: true,
+
+			axiosChecking: {
+				abortCtrl: null,
+				inProgress: false,
+				success: false,
+				error: false,
+				message: null,
+			},
+
+			axiosSrvRequest: {
+				abortCtrl: null,
+				inProgress: false,
+				success: false,
+				error: false,
+				message: null,
+			},
+
+			axiosUser: {
+				abortCtrl: null,
+				inProgress: false,
+				success: false,
+				error: false,
+				message: null,
+			},
+
+			chosenFile: null,
+			action: null,
+			modal: false,
+			checkingSettings: true,
+			errorMessage: '',
+			recipientType: '',
+			signatureType: '',
+			selfEmail: '',
+			localUser: [],
+			formattedOptions: [],
+			designerUrl: '',
+
+			signatureTypeSelected: 'simple', // Setting initial value
+			usersListProps: {
+				inputLabel: '',
+				userSelect: true,
+				multiple: true,
+				options: [],
+				appendToBody: false,
+				closeOnSelect: false,
+				uid: {
+					type: [String, Number],
+					default: () => uniqueId(),
+				},
+			},
 		};
 	},
 
-	created() {
+	beforeCreate() {
 		try {
+			log.info(`[beforeCreate] Running...`);
 			this.noUserResults = false;
 			this.usersLoading = false;
 			this.userResults = {};
-			this.user = '';
 
 			this.$root.$watch('chosenFile', async (newValue) => {
 				this.chosenFile = newValue;
-
-				if (newValue) {
-					this.modal = true;
-					this.requesting = false;
-					this.success = false;
-					this.error = false;
-					this.errorMessage = '';
-
-					const CancelToken = axios.CancelToken;
-					this.source = CancelToken.source();
-
-					// Verify App settings
-					this.runAPI('settings/check', this, 'ymsSettings', 'ymsSettingsChecked').then((response) => {
-						this.ymsSettings = response.data;
-
-						this.ymsSettingsChecked = true;
-					});
-
-					// Get current user Id
-					this.runAPI('user/id', this, 'currentUser.id').then((response) => {
-						this.currentUser.id = response.data;
-						this.getCurrentUser();
-					});
-					this.runAPI('user/email', this, 'currentUser.email').then((response) => {
-						this.currentUser.email = response.data;
-						this.getCurrentUser();
-					});
-
-					// Fill Nextcloud users list
-					// this.getUsersList();
-				} else {
-					this.modal = false;
-				}
+				this.commonWatch(newValue);
 			});
-		} catch (error) {
-			console.error(error.message);
+
+			this.$root.$watch('action', async (newValue) => {
+				this.action = newValue;
+				this.commonWatch(newValue);
+			});
+		} catch (exception) {
+			log.error(`[beforeCreate] ${exception}`);
 		}
 	},
 
 	mounted() {
-		this.resetInputs();
+		let scriptSvgLoader = document.createElement('script');
+		scriptSvgLoader.setAttribute('src', this.ui.scripts.svgLoader);
+		document.head.appendChild(scriptSvgLoader);
 	},
 
 	methods: {
-		resetInputs: function () {
-			this.user = '';
-			this.userResults = {};
-			this.noUserResults = false;
-			this.usersLoading = false;
-			this.recipientType = this.constantes.self;
-			this.externalUserEmail = '';
-			this.localUser = [];
-			this.selfDisabled = false;
-		},
-		addUser(item) {
-			this.user = this.localUser.uid = item.value.shareWith;
-			this.localUser.email = item.shareWithDisplayNameUnique;
-			this.userResults = {};
-			this.noUserResults = false;
-		},
-		cancelSearchLabel() {
-			return t(appName, 'Cancel search');
-		},
-		isSearchingUser() {
-			return this.user !== '';
-		},
-		abortUserSearch() {
-			this.noUserResults = false;
-			this.usersLoading = false;
-			this.userResults = {};
-			this.user = '';
-		},
-
-		handleUserInput() {
-			this.error = false;
-			this.noUserResults = false;
-			this.usersLoading = true;
-			this.userResults = {};
-			this.debounceSearchUsers();
-		},
-
-		abortUserSearch() {
-			this.noUserResults = false;
-			this.usersLoading = false;
-			this.userResults = {};
-			this.user = '';
-		},
-
-		debounceSearchUsers: debounce(function () {
-			this.searchUsers();
-		}, 250),
-
-		async searchUsers() {
+		abortUserSearch: function () {
 			try {
-				const search = async (search, type) => {
-					return await axios.post(generateOcsUrl(`apps/${appName}/api/v1/users/all`), {
-						search,
-						type,
-					});
-				};
-
-				if (this.user.length >= 3) {
-					const response = await search(this.user, 'user');
-					// this.userResults = response?.data?.ocs?.data || {};
-					this.userResults = response?.data || {};
-					if (Array.isArray(this.userResults)) {
-						this.userResults = {};
-					}
-					this.usersLoading = false;
-					const users = this.userResults.users || [];
-					const exact = this.userResults.exact?.users || [];
-					if (!users.length && !exact.length) {
-						this.noUserResults = true;
-					}
-				}
+				log.debug(`[${this.getFunctionName()}] Running...`);
 			} catch (exception) {
-				console.error(exception);
-				showError(t(appName, 'An error occurred while performing the search'));
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
 
-		commonSignatureServerPost({urlPost, signerEmail = '', nxcUsername = '', appUrl = ''} = {}) {
+		addUser: function (item) {
 			try {
-				this.error = false;
-				this.requesting = true;
-				let urlRequest = generateOcsUrl(baseUrl + urlPost);
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.user = this.localUser.applicantId = item.value.shareWith;
+				this.localUser.email = item.shareWithDisplayNameUnique;
+				this.userResults = {};
+				this.noUserResults = false;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
 
-				axios({
-					url: urlRequest,
-					method: 'POST',
-					// timeout: 10000,
-					data: {
-						path: this.chosenFile.path,
-						appUrl: generateUrl(baseUrl + appUrl),
-						signatureType: this.signatureTypeSelected,
-						email: signerEmail,
-						username: nxcUsername,
-						fileId: this.chosenFile.fileid,
-					},
-				})
+		axiosSettingsCheck: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosChecking = this.initAxios();
+
+				log.info(`Contact server to check settings (Global)`);
+
+				axios
+					.get(getOcsUrl(this.apis.settingsCheck), {
+						signal: this.axiosChecking.abortCtrl.signal,
+					})
 					.then((response) => {
-						this.requesting = false;
-						if (response.data.session !== null && response.data.session !== '') {
-							this.success = true;
-							const yumisignCallback =
-								`${location.protocol}//${location.host}` +
-								// generateUrl(`/apps/${appName}`) +
-								generateUrl(`/apps/${appName}/sign/mobile/async/external/submit`) +
-								'?' +
-								`&workspaceId=${response.data.workspaceId}` +
-								`&workflowId=${response.data.workflowId}` +
-								`&envelopeId=${response.data.envelopeId}` +
-								`&url=${window.location.href}`;
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
 
-							this.designerUrl = response.data.designerUrl + '?callback=' + encodeURIComponent(yumisignCallback);
-							if (this.signatureTypeSelected.toLowerCase() === 'simple') {
-								window.location.replace(this.designerUrl);
-							}
+						if (isIssueResponse(response)) {
+							throw new Error(`No property named "code" in Axios response`);
+						}
+
+						// log.debug(`isEnabled(response.data.code):[${isEnabled(response.data.code)}]`);
+						log.debug(`isValidResponse(response):[${isValidResponse(response)}]`);
+
+						this.axiosChecking.success = true;
+						// this.rcdevsSettings.validated = isEnabled(response.data.code);
+						this.rcdevsSettings.validated = isValidResponse(response);
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosChecking.message = this.ui.axios.requestCancelled;
 						} else {
-							this.error = true;
-							this.errorMessage = 'Error: ' + response.data.message;
+							this.axiosChecking.message = exception.message;
+						}
+
+						this.axiosChecking.error = !(this.rcdevsSettings.validated = false);
+					})
+					.finally(() => {
+						this.axiosChecking.inProgress = false;
+						this.rcdevsSettings.checked = true;
+						this.refreshUiVariables();
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosSettingsCheckApp: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosChecking = this.initAxios();
+
+				log.info(`Contact server to check settings`);
+
+				axios
+					.get(getOcsUrl(this.apis.settingsCheckApp), {
+						signal: this.axiosChecking.abortCtrl.signal,
+					})
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+
+						// Check results Sign
+						if (!response.data.hasOwnProperty('enableSign')) {
+							throw new Error('Internal server error: this application cannot be enabled due to lack of information');
+						}
+						this.axiosChecking.success = true;
+						this.enabledApp.sign = isEnabled(response.data.enableSign) && this.isActionSign();
+						log.debug(`
+this.enabledApp.sign:[${this.enabledApp.sign}] /
+response.data.enableSign:[${response.data.enableSign}] /
+isEnabled(response.data.enableSign):[${isEnabled(response.data.enableSign)}] /
+this.isActionSign():[${this.isActionSign()}] /
+`);
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosChecking.message = this.ui.axios.requestCancelled;
+						} else {
+							this.axiosChecking.message = exception.message;
+						}
+
+						this.axiosChecking.error = !(this.enabledApp.sign = false);
+					})
+					.finally(() => {
+						this.axiosChecking.inProgress = false;
+						this.enabledApp.checked = true;
+						this.refreshUiVariables();
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosSettingsCheckTypes: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosChecking = this.initAxios();
+
+				log.info(`Contact server to check settings (Signature types)`);
+
+				axios
+					.get(getOcsUrl(this.apis.settingsCheckTypes), {
+						signal: this.axiosChecking.abortCtrl.signal,
+					})
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+
+						// Check results Advanced
+						if (!response.data.hasOwnProperty('signTypeAdvanced')) {
+							throw new Error('Sign type advanced is missing');
+						}
+
+						// Check results Qualified
+						if (!response.data.hasOwnProperty('signTypeQualified')) {
+							throw new Error('Sign type qualified is missing');
+						}
+
+						// Check results Standard
+						if (!response.data.hasOwnProperty('signTypeStandard')) {
+							throw new Error('Sign type standard is missing');
+						}
+
+						this.axiosChecking.success = true;
+
+						// Use temporary vars (issue on response which cannot be changed !?!)
+						let responseDataSigntypeadvanced = response.data.signTypeAdvanced;
+						let responseDataSigntypequalified = response.data.signTypeQualified;
+						let responseDataSigntypestandard = response.data.signTypeStandard;
+
+						// According to file to sign extension, disable the standard signature (if not a PDF)
+						if (!this.chosenFile.path.toLowerCase().endsWith('.pdf')) {
+							responseDataSigntypestandard = '0';
+						}
+
+						log.info(`The signTypes are standard : [${responseDataSigntypestandard}], advanced : [${responseDataSigntypeadvanced}] and qualified : [${responseDataSigntypeadvanced}]`);
+
+						this.signTypes.advanced.enabled = isEnabled(responseDataSigntypeadvanced);
+						this.signTypes.qualified.enabled = isEnabled(responseDataSigntypequalified);
+						this.signTypes.standard.enabled = isEnabled(responseDataSigntypestandard);
+
+						let cptEnabled = 0;
+						cptEnabled += +this.signTypes.advanced.enabled;
+						cptEnabled += +this.signTypes.qualified.enabled;
+						cptEnabled += +this.signTypes.standard.enabled;
+						log.debug(`this.signTypes.advanced.enabled:[${this.signTypes.advanced.enabled}] / this.signTypes.qualified.enabled:[${this.signTypes.qualified.enabled}] / this.signTypes.standard.enabled:[${this.signTypes.standard.enabled}] / cptEnabled:[${cptEnabled}]`);
+
+						switch (cptEnabled) {
+							case 0:
+								throw new Error('Minimum one signature type is needed to sign the document');
+								break;
+							case 1:
+								this.signTypes.advanced.label = this.signTypes.qualified.label = this.signTypes.standard.label = getT('Signature');
+								break;
+
+							default:
+								this.signTypes.advanced.label = this.constantes.signType.advanced.label;
+								this.signTypes.qualified.label = this.constantes.signType.qualified.label;
+								this.signTypes.standard.label = this.constantes.signType.standard.label;
+								break;
 						}
 					})
-					.catch((error) => {
-						this.requesting = false;
-						this.error = true;
-						this.errorMessage = error;
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosChecking.message = this.ui.axios.requestCancelled;
+						} else {
+							this.axiosChecking.message = exception.message;
+						}
+
+						this.axiosChecking.error = !(this.signTypes.advanced.enabled = this.signTypes.qualified.enabled = this.signTypes.standard.enabled = false);
+					})
+					.finally(() => {
+						this.axiosChecking.inProgress = false;
+						this.signTypes.checked = true;
+						this.refreshUiVariables();
+						log.debug(`this.signTypes.advanced.enabled:[${this.signTypes.advanced.enabled}] / this.signTypes.qualified.enabled:[${this.signTypes.qualified.enabled}] / this.signTypes.standard.enabled:[${this.signTypes.standard.enabled}]`);
+						log.debug(`this.enabledSign:[${this.enabledSign}]`);
 					});
-			} catch (error) {
-				console.error(error.message);
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
+
+		axiosSignLocalAsync: function (apiUrlSignature, recipientId, recipientEmail, recipientType) {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosSrvRequest = this.initAxios();
+
+				log.info(`chosenFile : ${JSON.stringify(this.chosenFile)}`);
+				log.info(`fileId : ${this.chosenFile._attributes.fileid}`);
+
+				axios
+					.post(
+						getOcsUrl(apiUrlSignature),
+						{
+							path: this.chosenFile.path,
+							fileId: this.chosenFile._attributes.fileid,
+							recipientId: recipientId,
+							recipientEmail: recipientEmail,
+							recipientType: recipientType,
+						},
+						{
+							signal: this.axiosSrvRequest.abortCtrl.signal,
+						}
+					)
+					.then((response) => {
+						log.debug(`Asynchronized signature response : [${JSON.stringify(response.data)}]`);
+
+						if (isIssueResponse(response)) {
+							throw new Error(getT('Error: ') + getT(response.data.message));
+						}
+						this.axiosSrvRequest.error = !(this.file.signed = this.axiosSrvRequest.success = true);
+						this.axiosSrvRequest.message = response.data.message;
+
+						const yumisignCallback = `${location.protocol}//${location.host}` + generateUrl(`/apps/${appName}/sign/mobile/async/external/submit`) + '?' + `&workspaceId=${response.data.workspaceId}` + `&workflowId=${response.data.workflowId}` + `&envelopeId=${response.data.envelopeId}` + `&url=${window.location.href}`;
+
+						if (response.data.designerUrl) {
+							this.designerUrl = response.data.designerUrl + '?callback=' + encodeURIComponent(yumisignCallback);
+							if (this.signatureTypeSelected.toLowerCase() !== this.constantes.signType.qualified.value) {
+								window.location.replace(this.designerUrl);
+							}
+						}
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosSrvRequest.message = this.ui.axios.requestCancelled;
+						} else {
+							this.axiosSrvRequest.message = exception.message;
+						}
+
+						this.axiosSrvRequest.error = !(this.file.signed = false);
+					})
+					.finally(() => {
+						this.axiosSrvRequest.inProgress = false;
+						this.refreshUiVariables();
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosUserEmail: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosUser = this.initAxios();
+
+				log.info(`Contact server to retrieve User's email`);
+
+				axios
+					.get(getOcsUrl(this.apis.userEmail), {
+						signal: this.axiosUser.abortCtrl.signal,
+					})
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+
+						this.currentUser.email = response.data;
+						this.getCurrentUser();
+
+						this.axiosUser.success = true;
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosUser.message = this.ui.axios.requestCancelled;
+						} else {
+							this.axiosUser.message = exception.message;
+						}
+
+						this.axiosUser.error = true;
+						this.currentUser.email = null;
+					})
+					.finally(() => {
+						this.axiosUser.inProgress = false;
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosUserId: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosUser = this.initAxios();
+
+				log.info(`Contact server to retrieve User's id`);
+
+				axios
+					.get(getOcsUrl(this.apis.userId), {
+						signal: this.axiosUser.abortCtrl.signal,
+					})
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+
+						this.currentUser.id = response.data;
+						this.getCurrentUser();
+
+						this.axiosUser.success = true;
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosUser.message = this.ui.axios.requestCancelled;
+						} else {
+							this.axiosUser.message = exception.message;
+						}
+
+						this.axiosUser.error = true;
+						this.currentUser.id = null;
+					})
+					.finally(() => {
+						this.axiosUser.inProgress = false;
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosUsersList: function (query) {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosUser = this.initAxios();
+
+				log.info(`Contact server to retrieve Users list`);
+
+				return axios
+					.post(
+						getOcsUrl(this.apis.usersAll),
+						{
+							search: query,
+							type: 'user',
+						},
+						{
+							signal: this.axiosUser.abortCtrl.signal,
+						}
+					)
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						this.axiosUser.success = true;
+
+						const respData = response.data;
+						const exact = respData.exact?.users || [];
+						const users = respData.users || [];
+						log.debug(`[${this.getFunctionName()}] respData:[${respData}] / exact:[${exact}] / users:[${users}]`);
+
+						this.usersListProps.options = [];
+
+						exact.forEach((singleUser) => {
+							log.debug(`[${this.getFunctionName()}] singleUser:[${JSON.stringify(singleUser)}]`);
+							this.usersListProps.options.push({
+								id: singleUser.value.shareWith,
+								displayName: singleUser.label,
+								subname: singleUser.shareWithDisplayNameUnique,
+							});
+						});
+
+						users.forEach((singleUser) => {
+							log.debug(`[${this.getFunctionName()}] singleUser:[${JSON.stringify(singleUser)}]`);
+							this.usersListProps.options.push({
+								id: singleUser.value.shareWith,
+								displayName: singleUser.label,
+								subname: singleUser.shareWithDisplayNameUnique,
+							});
+						});
+
+						log.debug(`[${this.getFunctionName()}] this.usersListProps.options:[${JSON.stringify(this.usersListProps.options)}]`);
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosUser.message = this.ui.axios.requestCancelled;
+						} else {
+							this.axiosUser.message = exception.message;
+						}
+
+						this.axiosUser.error = true;
+						this.currentUser.id = null;
+					})
+					.finally(() => {
+						this.axiosUser.inProgress = false;
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		cancelSearchLabel: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				return getT('Cancel search');
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
 		changeNcSelectvalue: function (radiovalue) {
 			try {
-				if (!(this.selfDisabled && radiovalue === this.constantes.self)) {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				if (!(this.selfDisabled && radiovalue === this.constantes.self.label)) {
 					this.recipientType = radiovalue;
 				}
-			} catch (error) {
-				console.error(error.message);
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
-		getBasename: function () {
+
+		closeModal: function () {
 			try {
-				return this.chosenFile ? this.chosenFile._attributes.basename : '';
-			} catch (error) {
-				console.error(error.message);
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				if (this.axiosSrvRequest.abortCtrl && this.axiosSrvRequest.abortCtrl.signal) {
+					this.axiosSrvRequest.abortCtrl.abort('Operation canceled by the user');
+					log.info('Operation canceled by the user');
+				}
+
+				this.resetInputs();
+				this.$root.$emit('dialog:closed');
+
+				// Reset inputs
+				this.usersListProps.options = [];
+				this.emailsList = '';
+
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
+
+		commonSyncSign: function (action, response) {
+			log.debug(`Refresh ${action} file : [${response.data.data.fileId}]`);
+
+			const davUrl = generateRemoteUrl('dav');
+			const currentUserId = getCurrentUser()?.uid;
+
+			log.debug(`DAV : [${davUrl}/files/${currentUserId}/${response.data.data.name}]`);
+
+			const file = new File({
+				source: `${davUrl}/files/${currentUserId}/${response.data.data.name}`,
+				id: response.data.data.fileId,
+				size: response.data.data.size,
+				mtime: new Date(),
+				mime: 'application/pdf',
+				owner: getCurrentUser()?.uid || null,
+				permissions: Permission.ALL,
+				root: `/files/${currentUserId}`,
+			});
+
+			if (response.data.data.overwrite) {
+				emit('files:node:updated', file);
+			} else {
+				emit('files:node:created', file);
+			}
+
+			this.axiosSrvRequest.error = !(this.file.signed = this.axiosSrvRequest.success = true);
+		},
+		
+		commonWatch: function (newValue) {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				if (newValue) {
+					this.modal = true;
+
+					this.resetInputs();
+
+					// Verify App settings
+					this.axiosSettingsCheck();
+
+					// Check Signature Types
+					this.axiosSettingsCheckTypes();
+					this.axiosSettingsCheckApp();
+
+					// Get current user Id
+					this.axiosUserId();
+					this.axiosUserEmail();
+				} else {
+					this.modal = false;
+				}
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		debounceSearchUsers: debounce(function (query, loading) {
+			this.searchUsers(query, loading);
+		}, 250),
+
+		findUsersFiltered: function () {
+			log.info(this.usersListProps.value);
+		},
+
 		getCurrentUser: function () {
-			this.currentUserFullData = '';
 			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.currentUserFullData = '';
+
 				switch (true) {
-					case this.isEmail(this.currentUser.id):
+					case isEmail(this.currentUser.id):
 						this.currentUserFullData = this.currentUser.id;
 						break;
-					case this.currentUser.email === '' || this.currentUser.email === null:
-						this.recipientType = this.constantes.nextcloud;
-						this.selfDisabled = true;
-						this.currentUserFullData = t(appName, 'Your email is not defined; self signature is disabled');
-
-						break;
 					default:
-						this.currentUserFullData = this.currentUser.id + '<' + this.currentUser.email + '>';
+						this.currentUserFullData = this.currentUser.id;
 						break;
 				}
-			} catch (error) {
-				console.error(error.message);
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 				this.currentUserFullData = '';
 			}
 		},
-		isSettingOK: function () {
+
+		getFilenameMessage: function () {
 			try {
-				return this.ymsSettings;
-			} catch (error) {
-				console.error(error.message);
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				let localReturn = this.isActionSign() ? this.ui.messages.filenameMessage.sign : '';
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
+
+		getFunctionName: function () {
+			const error = new Error();
+			const stackLines = error.stack.split('\n');
+			// The stack trace format can vary; you may need to adjust the index
+			const callerLine = stackLines[2].trim();
+			const functionName = callerLine.split(' ')[1];
+			return functionName;
+		},
+
+		getModalTitle: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				let localReturn = this.isActionSign() ? this.ui.title.sign : '';
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		getNcModalAriaLabel: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				if (this.isActionSign()) {
+					getT(signatureLabel);
+				}
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		handleUserInput: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosSrvRequest.error = false;
+				this.noUserResults = false;
+				this.usersLoading = true;
+				this.userResults = {};
+				this.debounceSearchUsers();
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		initAxios: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				let currentAxios = {};
+				currentAxios.abortCtrl = new AbortController();
+				currentAxios.inProgress = true;
+				currentAxios.error = false;
+				currentAxios.message = null;
+
+				return currentAxios;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		isActionSign: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				let localReturn = this.action === signAction ? true : false;
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		isDisabledSign: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				// Using rcdevsSettings.checked because if not checked, impossible to say if Settings are OK or KO
+				let localReturn = this.rcdevsSettings.checked && this.enabledApp.checked && this.signTypes.checked && (!this.enabledApp.sign || this.settingKO || (!this.signTypes.advanced.enabled && !this.signTypes.qualified.enabled && !this.signTypes.standard.enabled));
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		isEnabledSign: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				// Using rcdevsSettings.checked because if not checked, impossible to say if Settings are OK or KO
+				let localReturn = this.rcdevsSettings.checked && this.enabledApp.checked && this.signTypes.checked && this.enabledApp.sign && this.settingOK && (this.signTypes.advanced.enabled || this.signTypes.qualified.enabled || this.signTypes.standard.enabled);
+				log.debug(`
+rcdevsSettings.checked:[${this.rcdevsSettings.checked}] /
+enabledApp.checked:[${this.enabledApp.checked}] /
+signTypes.checked:[${this.signTypes.checked}] /
+enabledApp.sign:[${this.enabledApp.sign}] /
+settingOK:[${this.settingOK}] /
+signTypes.advanced.enabled:[${this.signTypes.advanced.enabled}] /
+signTypes.qualified.enabled:[${this.signTypes.qualified.enabled}] /
+signTypes.standard.enabled:[${this.signTypes.standard.enabled}] /
+				`);
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		isSearchingUser: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				return this.user !== '';
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
 		isSettingKO: function () {
 			try {
-				return !this.isSettingOK() && this.ymsSettingsChecked;
-			} catch (error) {
-				console.error(error.message);
-			}
-		},
-		isTransactionInProgress: function () {
-			try {
-				return this.requesting || this.success;
-			} catch (error) {
-				console.error(error.message);
-			}
-		},
-		isRequesting: function () {
-			try {
-				return this.requesting;
-			} catch (error) {
-				console.error(error.message);
-			}
-		},
-		isSuccesNotSimpleTypeSignature: function () {
-			try {
-				return !this.signatureTypeSelected && this.success;
-			} catch (error) {
-				console.error(error.message);
-			}
-		},
-		isEmailList: function (listToCheck) {
-			try {
-				// let formattedString = listToCheck.replace(/,/g, ";");
-				let formattedString = listToCheck.replaceAll(new RegExp(/,/g), ';');
-				// let formattedString = listToCheck.replaceAll(",", ";");
-				let emailsToCheck = formattedString.split(';');
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				// Using rcdevsSettings.checked because if not checked, impossible to say if Settings are OK or KO
+				let localReturn = this.rcdevsSettings.checked && !this.rcdevsSettings.validated;
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
 
-				let validEmails = 0;
-				let scope = this;
-				emailsToCheck.forEach(function (item, index) {
-					if (!scope.isEmail(item)) {
-						return false;
-					} else {
-						validEmails++;
-					}
-					return true;
-				});
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
 
-				if (emailsToCheck.length !== validEmails) {
-					throw new Error('Invalid mail format');
-				} else {
-					return true;
-				}
-			} catch (error) {
-				console.error(error.message);
-				this.errorMessage = error.message;
-				this.error = true;
+		isSettingOK: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				// Using rcdevsSettings.checked because if not checked, impossible to say if Settings are OK or KO
+				let localReturn = this.rcdevsSettings.checked && this.rcdevsSettings.validated;
+				log.debug(`
+rcdevsSettings.checked:[${this.rcdevsSettings.checked}] /
+rcdevsSettings.validated:[${this.rcdevsSettings.validated}] /
+				`);
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
-		isEmail: function (emailToCheck) {
+
+		isSrvRequestInProgress: function () {
 			try {
-				var pattern = new RegExp(
-					/^((([a-z]|\d|[!#\$%&'\*\+\-\/=\?\^_`{\|}~]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+(\.([a-z]|\d|[!#\$%&'\*\+\-\/=\?\^_`{\|}~]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+)*)|((\x22)((((\x20|\x09)*(\x0d\x0a))?(\x20|\x09)+)?(([\x01-\x08\x0b\x0c\x0e-\x1f\x7f]|\x21|[\x23-\x5b]|[\x5d-\x7e]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(\\([\x01-\x09\x0b\x0c\x0d-\x7f]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]))))*(((\x20|\x09)*(\x0d\x0a))?(\x20|\x09)+)?(\x22)))@((([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.)+(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])([a-z]|\d|-|\.|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.?$/i
-				);
-				return pattern.test(emailToCheck);
-			} catch (error) {
-				console.error(error.message);
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				let localReturn = this.axiosSrvRequest.inProgress;
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
-		submitSignature: function () {
-			let recipientEmail = null;
+
+		isSrvRequestSuccess: function () {
 			try {
-				switch (true) {
-					case this.recipientType === 'self':
-						console.info('#1 is chosen');
-						this.commonSignatureServerPost({
-							urlPost: '/api/v1/sign/mobile',
-							appUrl: '/webhook',
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				let localReturn = !this.axiosSrvRequest.inProgress && this.axiosSrvRequest.success;
+				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
+
+				return localReturn;
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		refreshUiVariables: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				log.debug('Refresh UI Vars');
+				this.actionSign = this.isActionSign();
+				this.disabledSign = this.isDisabledSign();
+				this.enabledSign = this.isEnabledSign();
+				this.file.message = this.getFilenameMessage();
+				this.ncModalAriaLabel = this.getNcModalAriaLabel();
+				this.settingKO = this.isSettingKO();
+				this.settingOK = this.isSettingOK();
+				this.axiosSrvRequest.success = this.isSrvRequestSuccess();
+				this.axiosSrvRequest.inProgress = this.isSrvRequestInProgress();
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		resetInputs: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.ui.title.chosen = this.getModalTitle();
+
+				this.axiosChecking = {
+					abortCtrl: null,
+					inProgress: false,
+					success: false,
+					error: false,
+					message: null,
+				};
+
+				this.axiosSrvRequest = {
+					abortCtrl: null,
+					inProgress: false,
+					success: false,
+					error: false,
+					message: null,
+				};
+				log.info(`Initialize axiosSrvRequest : [${JSON.stringify(this.axiosSrvRequest)}]`);
+
+				this.axiosUser = {
+					abortCtrl: null,
+					inProgress: false,
+					success: false,
+					error: false,
+					message: null,
+				};
+
+				this.userResults = {};
+				this.noUserResults = false;
+				this.usersLoading = false;
+				this.recipientType = this.constantes.self.label;
+				this.localUser = [];
+				this.selfDisabled = false;
+
+				this.enabledApp = {
+					checked: false,
+					sign: false,
+				};
+
+				this.file = {
+					message: '',
+					signed: false,
+					basename: getBasename(this.chosenFile),
+				};
+
+				this.rcdevsSettings = {
+					checked: false,
+					validated: false,
+				};
+
+				this.signTypes = {
+					checked: false,
+					advanced: {
+						additional: this.constantes.signType.advanced.additional,
+						enabled: false,
+						label: '',
+					},
+					qualified: {
+						additional: this.constantes.signType.qualified.additional,
+						enabled: false,
+						label: '',
+					},
+					standard: {
+						additional: this.constantes.signType.standard.additional,
+						enabled: false,
+						label: '',
+					},
+				};
+
+				this.refreshUiVariables();
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		runTransactionSignature: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				log.debug(`this.signatureType : [${this.signatureType}]`);
+
+				let apiUrlSignature = `${this.apis.signLocalAsync}/${this.signatureType}`;
+				let recipientId = '';
+				let recipientEmail = '';
+
+				switch (this.recipientType) {
+					case this.constantes.self.label:
+						recipientId = this.currentUser.id;
+						recipientEmail = '';
+						break;
+					case this.constantes.nextcloud:
+						this.usersListProps.value.forEach((unitUser) => {
+							if (recipientId.length > 0) {
+								recipientId += ',';
+							}
+							recipientId += unitUser.id;
 						});
+						recipientEmail = '';
 						break;
-
-					case this.recipientType === 'nextcloud' && this.localUser !== null:
-						if (this.isEmail(this.localUser.uid)) {
-							recipientEmail = this.localUser.uid;
-						} else {
-							recipientEmail = this.localUser.email;
-						}
-						if (this.isEmail(recipientEmail)) {
-							console.info('#2 is chosen');
-							this.commonSignatureServerPost({
-								urlPost: '/api/v1/sign/mobile/async/local',
-								signerEmail: recipientEmail,
-								nxcUsername: this.localUser.uid,
-								appUrl: '/webhook',
-							});
-						} else {
-							this.errorMessage = t(appName, 'Invalid email');
-						}
-						break;
-					case this.recipientType === 'external' && this.externalUserEmail !== '' && this.signatureTypeSelected !== '':
-						if (this.isEmailList(this.externalUserEmail)) {
-							console.info('#3 is chosen');
-							this.commonSignatureServerPost({
-								urlPost: '/api/v1/sign/mobile/async/external',
-								signerEmail: this.externalUserEmail,
-								appUrl: '/webhook',
-							});
-						} else {
-							this.errorMessage = t(appName, 'Invalid email');
-						}
+					case this.constantes.email:
+						recipientId = '';
+						recipientEmail = this.emailsList;
 						break;
 
 					default:
-						console.log(`No chosen option : recipientType=${this.recipientType} / localUser=${JSON.stringify(this.localUser)} / externalUserEmail=${this.externalUserEmail} / signatureTypeSelected=${this.signatureTypeSelected}`);
+						throw new Error('Invalid recipient type');
 						break;
 				}
-			} catch (error) {
-				console.error(error.message);
+
+				this.axiosSignLocalAsync(apiUrlSignature, recipientId, recipientEmail, this.recipientType);
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
 
-		runAPI: function (urlApi, mainThis, variableToFill, flag = '') {
+		search: function (query, loading) {
 			try {
-				return axios
-					.get(
-						generateOcsUrl(`apps/${appName}/api/v1/${urlApi}`),
-						{},
-						{
-							cancelToken: this.source.token,
-						}
-					)
-					.catch((error) => {
-						mainThis[variableToFill] = null;
-						this.error = true;
-						console.log(error);
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				log.debug(`[${this.getFunctionName()}] query : [${query}]`);
+
+				if (query.length >= 3) {
+					this.axiosUsersList(query);
+				}
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+				showError(getT('An error occurred while performing the search'));
+			}
+		},
+
+		// async searchUsers(query, loading) {
+		searchUsers: async function (query, loading) {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				log.debug(`[${this.getFunctionName()}] query : [${query}]`);
+
+				if (query.length >= 3) {
+					this.usersListProps.loading = true;
+					const search = async (search, type) => {
+						return await axios
+							.post(getOcsUrl(this.apis.usersAll), {
+								search: query,
+								type: 'user',
+							})
+							.finally(() => {
+								this.usersListProps.loading = false;
+							});
+					};
+
+					const exact = search.exact?.users || [];
+					const users = search.users || [];
+					log.debug(`[${this.getFunctionName()}] search:[${search}] / exact:[${exact}] / users:[${users}]`);
+
+					this.usersListProps.options = [];
+
+					exact.forEach((singleUser) => {
+						this.usersListProps.options.push({
+							id: singleUser.value.shareWith,
+							displayName: singleUser.label,
+							subname: singleUser.shareWithDisplayNameUnique,
+						});
 					});
-			} catch (error) {
-				console.error(error.message);
+
+					users.forEach((singleUser) => {
+						this.usersListProps.options.push({
+							id: singleUser.value.shareWith,
+							displayName: singleUser.label,
+							subname: singleUser.shareWithDisplayNameUnique,
+						});
+					});
+				}
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+				showError(getT('An error occurred while performing the search'));
 			}
 		},
-		closeModal: function () {
-			try {
-				this.resetInputs();
-				this.$root.$emit('dialog:closed');
-			} catch (error) {
-				console.error(error.message);
-			}
-		},
-	},
+	}, // END methods
 };
 </script>

@@ -11,11 +11,11 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
 -->
 
@@ -30,21 +30,12 @@
 		<div class="ymsSettingsPartsContainer">
 			<div v-for="item in items" :key="item" class="ymsSettingsList">
 				<div @click="updateId(item)">
-					<label>
-						<input
-							v-model="itemId"
-							type="radio"
-							name="itemId"
-							autocomplete="off"
-							:value="item">{{ item }}
-					</label>
+					<label> <input v-model="itemId" type="radio" name="itemId" autocomplete="off" :value="item" />{{ item }} </label>
 				</div>
 			</div>
 		</div>
 		<div class="ymsSettingsFooter">
-			<div v-if="itemId" class="">
-				{{ t('yumisign_nextcloud', 'You have selected:') }} {{ itemId }}
-			</div>
+			<div v-if="itemId" class=""> {{ t('yumisign_nextcloud', 'You have selected:') }} {{ itemId }} </div>
 			<div class="btns">
 				<button @click="_cancel">
 					{{ cancelButton }}
@@ -58,12 +49,12 @@
 </template>
 
 <script>
-import PopupModal from './PopupModal.vue'
+import PopupModal from './Common/PopupModal.vue';
 
 export default {
 	name: 'WorkspaceListIds',
 
-	components: { PopupModal },
+	components: {PopupModal},
 
 	data: () => ({
 		// Parameters that change depending on the type of dialogue
@@ -80,49 +71,59 @@ export default {
 
 	methods: {
 		show(opts = {}) {
-			this.title = opts.title
-			this.message = opts.message
-			this.items = opts.items
-			this.okButton = opts.okButton
-			this.updateId = opts.updateId
-			this.itemId = undefined
+			this.title = opts.title;
+			this.message = opts.message;
+			this.items = opts.items;
+			this.okButton = opts.okButton;
+			this.updateId = opts.updateId;
+			this.itemId = undefined;
 
 			if (opts.cancelButton) {
-				this.cancelButton = opts.cancelButton
+				this.cancelButton = opts.cancelButton;
 			}
 			// Once we set our config, we tell the popup modal to open
-			this.$refs.popup.open()
+			this.$refs.popup.open();
 			// Return promise so the caller can get results
 			return new Promise((resolve, reject) => {
-				this.resolvePromise = resolve
-				this.rejectPromise = reject
-			})
+				this.resolvePromise = resolve;
+				this.rejectPromise = reject;
+			});
 		},
 
 		updateId(item) {
-			this.opts.updateId(item)
+			this.opts.updateId(item);
 		},
 
 		_confirm() {
-			this.$refs.popup.close()
-			this.resolvePromise(true)
+			this.$refs.popup.close();
+			this.resolvePromise(true);
 		},
 
 		_cancel() {
-			this.$refs.popup.close()
-			this.resolvePromise(false)
+			this.$refs.popup.close();
+			this.resolvePromise(false);
 			// Or you can throw an error
 			// this.rejectPromise(new Error('User canceled the dialogue'))
 		},
 	},
-}
+};
 </script>
 
 <style scoped>
 .btns {
+	font-family: Nunito;
+	font-weight: bold;
 	display: flex;
 	flex-direction: row;
 	justify-content: space-between;
+}
+.btns button {
+	margin: auto;
+}
+.popup-modal h2 {
+	font-family: Nunito;
+	font-weight: bold;
+	color: var(--clrMessageText);
 }
 
 .ok-btn {
@@ -157,10 +158,9 @@ export default {
 	padding-bottom: 5px;
 }
 
-input[type='radio']{
+input[type='radio'] {
 	vertical-align: baseline;
 	height: auto;
 	min-height: 1px;
 }
-
 </style>

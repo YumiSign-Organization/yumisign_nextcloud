@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-    <id>yumisign_nextcloud</id>
-    <name>YumiSign for Nextcloud</name>
+	xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>yumisign_nextcloud</id>
+	<name>YumiSign for Nextcloud</name>
 
-    <summary>Nextcloud app to sign your documents with YumiSign</summary>
-    <description><![CDATA[# Electronic Signature
+	<summary>Nextcloud app to sign your documents with YumiSign</summary>
+	<description><![CDATA[# Electronic Signature
 This YumiSign Plugin for Nextcloud allows users to digitally sign documents directly within the Nextcloud platform. With this plugin, you can securely sign PDFs, Word documents, and other supported file types with ease, ensuring the integrity and authenticity of your documents.
 
 # Features
@@ -55,43 +55,43 @@ For more support and information:
 Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.com) to purchase e-signature credits.
 ]]></description>
 
-    <version>1.28.4</version>
-    <licence>agpl</licence>
+	<version>1.28.5</version>
+	<licence>agpl</licence>
 
-    <author mail="info@rcdevs.com">RCDevs</author>
-    <namespace>YumiSignNxtC</namespace>
+	<author mail="info@rcdevs.com">RCDevs</author>
+	<namespace>YumiSignNxtC</namespace>
 
-    <documentation>
-        <user>https://app.yumisign.com/help/</user>
-    </documentation>
+	<documentation>
+		<user>https://app.yumisign.com/help/</user>
+	</documentation>
 
-    <category>files</category>
-    <category>office</category>
-    <category>security</category>
-    <category>tools</category>
+	<category>files</category>
+	<category>office</category>
+	<category>security</category>
+	<category>tools</category>
 
-    <website>https://www.yumisign.com</website>
-    <bugs>https://github.com/rcdevs/yumisign_nextcloud/issues</bugs>
-    <repository>https://github.com/rcdevs/yumisign_nextcloud.git</repository>
+	<website>https://www.yumisign.com</website>
+	<bugs>https://github.com/rcdevs/yumisign_nextcloud/issues</bugs>
+	<repository>https://github.com/rcdevs/yumisign_nextcloud.git</repository>
 
-    <screenshot>
-        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/N28/screenshots/screenshot-menu.png
-    </screenshot>
-    <screenshot>
-        https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/N28/screenshots/screenshot-modal.png
-    </screenshot>
+	<screenshot>
+		https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/N28/screenshots/screenshot-menu.png
+	</screenshot>
+	<screenshot>
+		https://raw.githubusercontent.com/rcdevs/yumisign_nextcloud/N28/screenshots/screenshot-modal.png
+	</screenshot>
 
-    <dependencies>
-        <php min-version="8.2" />
-        <nextcloud min-version="28" max-version="28" />
-    </dependencies>
+	<dependencies>
+		<php min-version="8.2" />
+		<nextcloud min-version="28" max-version="28" />
+	</dependencies>
 
-    <background-jobs>
-        <job>OCA\YumiSignNxtC\BackgroundJob\CheckAsyncSignatureTask</job>
-    </background-jobs>
+	<background-jobs>
+		<job>OCA\YumiSignNxtC\BackgroundJob\CheckAsyncSignatureTask</job>
+	</background-jobs>
 
-    <settings>
-        <admin>OCA\YumiSignNxtC\Settings\Admin\AdminSettings</admin>
-        <admin-section>OCA\YumiSignNxtC\Settings\Admin\AdminSection</admin-section>
-    </settings>
+	<settings>
+		<admin>OCA\YumiSignNxtC\Controller\SettingsController</admin>
+		<admin-section>OCA\YumiSignNxtC\Settings\Admin\AdminSection</admin-section>
+	</settings>
 </info>
