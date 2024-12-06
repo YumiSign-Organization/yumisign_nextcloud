@@ -46,7 +46,20 @@ class Version000099_2024_09_24_10_expiry_date_01 extends SimpleMigrationStep
 				 */
 				// Drop old column 'expiry_Date' column if needed
 				if ($table->hasColumn($this->expiry_Date_caseError)) {
-					$table->dropColumn($this->expiry_Date_caseError);
+					/**
+					 * Due to Doctrine bug which lowercase the column name...
+					 * We try to run the query with real (supposed) column name
+					 * If failure, lowercase the colunm name
+					 */
+					try {
+						$table->dropColumn($this->expiry_Date_caseError);
+					} catch (\Throwable $th) {
+						/**
+						 * We suppose the exception comes from the case on column name
+						 * Try again
+						 */
+						$table->dropColumn(strtolower($this->expiry_Date_caseError));
+					}
 				}
 
 				// Add 'expiry_date' column if needed, otherwise modify it
@@ -75,7 +88,7 @@ class Version000099_2024_09_24_10_expiry_date_01 extends SimpleMigrationStep
 		/** @var ISchemaWrapper $schema */
 		$schema = $schemaClosure();
 		if (!$schema->hasTable($this->tableSignSessions)) {
-			throw new Exception("Table tableSignSessions is missing", 1);;
+			throw new Exception("Table tableSignSessions is missing", 1);
 		}
 
 		$table = $schema->getTable($this->tableSignSessions);
