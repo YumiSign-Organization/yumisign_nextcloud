@@ -16,3 +16,7 @@ tests/php/clover.xml
 /*.l10nignore
 /composer.lock
 /package-lock.json
+
+$FolderiChanger.ico
+desktop.ini
+Thumbs.db

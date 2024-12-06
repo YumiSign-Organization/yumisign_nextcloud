@@ -13,202 +13,285 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  *
  */
 
 namespace OCA\YumiSignNxtC\Controller;
 
-use \OCP\AppFramework\Http\RedirectResponse;
+use Exception;
+use OCA\RCDevs\Controller\SignController as RCDevsSignController;
+use OCA\RCDevs\Entity\UserEntity;
+use OCA\RCDevs\Entity\UsersListEntity;
+use OCA\RCDevs\Utility\Helpers;
+use OCA\RCDevs\Utility\LogRCDevs;
+use OCA\RCDevs\Utility\SignatureType;
 use OCA\YumiSignNxtC\Db\SignSessionMapper;
-use OCA\YumiSignNxtC\Service\Constante;
-use OCA\YumiSignNxtC\Service\Cst;
+use OCA\YumiSignNxtC\Service\ConfigurationService;
 use OCA\YumiSignNxtC\Service\SignService;
-use OCA\YumiSignNxtC\Service\Yumisign;
-use OCA\YumiSignNxtC\Utility\Utility;
+use OCA\YumiSignNxtC\Utility\Constantes\CstException;
+use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
 use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Collaboration\Collaborators\ISearch;
+use OCP\Files\IRootFolder;
+use OCP\IConfig;
 use OCP\IRequest;
-use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Util;
-use Psr\Log\LoggerInterface;
 
 class SignController extends Controller
 {
-
-	private string $userId;
-	private string|null $userEmail;
-	private array $userIntel;
-	private $signService;
-	private $logger;
-	private $mapper;
-
-	/** @var IUserManager */
-	private $userManager;
+	private	ConfigurationService	$configurationService;
+	private	RCDevsSignController	$rcdevsSignController;
+	private IConfig					$config;
+	private IUserManager			$userManager;
+	private string					$currentUserId;
+	private UserEntity				$applicant;
 
 	public function __construct(
-		$AppName,
-		IRequest $request,
-		SignService $signService,
-		$UserId,
-		LoggerInterface $logger,
-		SignSessionMapper $mapper,
-		IUserManager $userManager,
-		private ISearch $search,
-		private IUserSession $userSession,
-		private IURLGenerator $urlGenerator,
+		IConfig								$config,
+		IRequest							$request,
+		IUserManager						$userManager,
+		private			IRootFolder			$rootFolder,
+		private			ISearch				$search,
+		private			IUserSession		$userSession,
+		private			LogRCDevs			$logRCDevs,
+		private			SignService			$signService,
+		private			SignSessionMapper	$mapper,
+		string								$AppName,
+		string								$UserId,
 	) {
 		parent::__construct($AppName, $request);
-		$this->userId = $UserId;
-		$this->signService = $signService;
-		$this->logger = $logger;
-		$this->mapper = $mapper;
 
-		$this->userManager = $userManager;
+		$this->config			= $config;
+		$this->currentUserId	= $UserId;
+		$this->request			= $request;
+		$this->userManager		= $userManager;
 
-		// Get user email
-		$this->userEmail = $this->userManager->get($this->userId)->getEMailAddress();
-		// If standard email is empty and userId is an email, use userId
-		if (empty($this->userEmail) && filter_var($this->userId, FILTER_VALIDATE_EMAIL)) {
-			$this->userEmail = $this->userId;
-		}
+		$this->configurationService = new ConfigurationService($config);
 
-		// Define "Sender name" which will be displayed on YMS push/email : "You received a signature request from ..."
-		$displayName = $this->userManager->get($this->userId)->getDisplayName();
-		if (empty($displayName)) {
-			$displayName = $this->userEmail;
-		}
-
-		$this->userIntel = [
-			Constante::get(Cst::USERID)					=> $this->userId,
-			Constante::yumisign(Yumisign::SENDERNAME)	=> $displayName,
-		];
-	}
-
-	/**
-	 * @NoAdminRequired
-	 */
-	public function mobileSign()
-	{
-		if (empty($this->userEmail) && empty($this->request->getParam('email'))) {
-			$resp['code'] = false;
-			$resp['message'] = "No email address found for this user";
-		} else {
-			$resp = $this->signService->asyncExternalMobileSignPrepare(
-				$this->request->getParam('path'),
-				$this->userEmail,
-				$this->userIntel,
-				$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
-				$this->request->getParam('signatureType'),
-				$this->request->getParam('fileId')
-			);
-
-			// Squeeze Designer if signature type is not SIMPLE
-			if (strcasecmp($this->request->getParam('signatureType'), Constante::get(Cst::YMS_SIMPLE)) !== 0) {
-				$resp = $this->signService->asyncExternalMobileSignSubmit(
-					$resp['workspaceId'],
-					$resp['workflowId'],
-					$resp['envelopeId']
-				);
-			}
-		}
-
-		return new JSONResponse([
-			'code' => $resp['code'],
-			'message'			=> Utility::getArrayData($resp, 'message',     false),
-			'session'			=> Utility::getArrayData($resp, 'session',     false),
-			'designerUrl'		=> Utility::getArrayData($resp, 'designerUrl', false),
-			'workspaceId'		=> Utility::getArrayData($resp, 'workspaceId', false),
-			'workflowId'		=> Utility::getArrayData($resp, 'workflowId',  false),
-			'envelopeId'		=> Utility::getArrayData($resp, 'envelopeId',  false),
-		]);
-	}
-
-	/**
-	 * @NoAdminRequired
-	 */
-	public function asyncLocalMobileSign()
-	{
-		// Retrieve chosen user email from Nextcloud database
-		$nextcloudUser = $this->userManager->get($this->request->getParam('username'));
-
-		if (empty($nextcloudUser->getEMailAddress()) && empty($this->request->getParam('email'))) {
-			$resp['code'] = false;
-			$resp['message'] = "No email address found for this user";
-		} else {
-			$resp = $this->signService->asyncExternalMobileSignPrepare(
-				$this->request->getParam('path'),
-				(empty($nextcloudUser->getEMailAddress()) ? $this->request->getParam('email') : $nextcloudUser->getEMailAddress()),
-				$this->userIntel,
-				$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
-				$this->request->getParam('signatureType'),
-				$this->request->getParam('fileId'),
-			);
-
-			// Squeeze Designer if signature type is not SIMPLE
-			if (strcasecmp($this->request->getParam('signatureType'), Constante::get(Cst::YMS_SIMPLE)) !== 0) {
-				$resp = $this->signService->asyncExternalMobileSignSubmit($resp['workspaceId'], $resp['workflowId'], $resp['envelopeId']);
-			}
-		}
-
-		return new JSONResponse([
-			'code'			=> $resp['code'],
-			'message'		=> $resp['message'],
-			'session'		=> $resp['session'],
-			'designerUrl'	=> $resp['designerUrl'],
-			'workspaceId'	=> $resp['workspaceId'],
-			'workflowId'	=> $resp['workflowId'],
-			'envelopeId'	=> $resp['envelopeId'],
-		]);
-	}
-
-	/**
-	 * @NoAdminRequired
-	 */
-	public function asyncExternalMobileSign()
-	{
-		$resp = $this->signService->asyncExternalMobileSignPrepare(
-			$this->request->getParam('path'),
-			$this->request->getParam('email'),
-			$this->userIntel,
-			$this->urlGenerator->getAbsoluteURL($this->request->getParam('appUrl')),
-			$this->request->getParam('signatureType'),
-			$this->request->getParam('fileId'),
+		// Common RCDevs Settings controller
+		$this->rcdevsSignController = new RCDevsSignController(
+			$this->request,
+			$this->configurationService,
+			$this->logRCDevs,
+			$AppName,
 		);
 
-		// Squeeze Designer if signature type is not SIMPLE
-		if (strcasecmp($this->request->getParam('signatureType'), Constante::get(Cst::YMS_SIMPLE)) !== 0) {
-			$resp = $this->signService->asyncExternalMobileSignSubmit($resp['workspaceId'], $resp['workflowId'], $resp['envelopeId']);
+		// Define "Sender name" which will be displayed on mobile push/email : "You received a signature request from ..."
+		$displayName = $this->userManager->get($this->currentUserId)->getDisplayName();
+		if (empty($displayName)) {
+			$displayName = $this->currentUserId;
 		}
 
-		return new JSONResponse([
-			'code'				=> array_key_exists('code', $resp) ? $resp['code'] : '',
-			'message'			=> array_key_exists('message', $resp) ? $resp['message'] : '',
-			'session'			=> array_key_exists('session', $resp) ? $resp['session'] : '',
-			'designerUrl'		=> array_key_exists('designerUrl', $resp) ? $resp['designerUrl'] : '',
-			'workspaceId'		=> array_key_exists('workspaceId', $resp) ? $resp['workspaceId'] : '',
-			'workflowId'		=> array_key_exists('workflowId', $resp) ? $resp['workflowId'] : '',
-			'envelopeId'		=> array_key_exists('envelopeId', $resp) ? $resp['envelopeId'] : '',
-		]);
+		$this->applicant = new UserEntity(
+			$this->config,
+			$this->rootFolder,
+			$this->userManager,
+			$this->currentUserId,
+			null,
+		);
+	}
+
+	/** ******************************************************************************************
+	 * PRIVATE
+	 ****************************************************************************************** */
+
+	// private function commonSignLocalAsync(bool $advanced = false, bool $qualified = false, bool $standard = false)
+	private function commonSignLocalAsync(SignatureType $signatureType)
+	{
+		$returned = [];
+
+		try {
+			$this->logRCDevs->debug(vsprintf('Asked signature type : (A:%b) (Q:%b) (S:%b)', [$signatureType->isAdvanced(), $signatureType->isQualified(), $signatureType->isStandard()]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+			// Define recipients list
+			$recipientsList = new UsersListEntity(
+				$this->config,
+				$this->rootFolder,
+				$this->userManager,
+				userIds: $this->request->getParam('recipientId'),
+				emailAddresses: $this->request->getParam('recipientEmail'),
+			);
+
+			// Get data from request
+			$resp = $this->signService->signLocalAsyncPrepare(
+				$this->applicant,
+				$recipientsList,
+				$this->request->getParam('path'),
+				$this->request->getParam('fileId'),
+				$signatureType,
+			);
+
+			$this->logRCDevs->debug(json_encode($resp), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			if (Helpers::isIssueResponse($resp)) {
+				throw new Exception($resp[CstRequest::MESSAGE], 1);
+			}
+
+			// Squeeze Designer if signature type is QUALIFIED
+			if (
+				$signatureType->isQualified()
+			) {
+				$resp = $this->signService->signLocalAsyncSubmit(
+					$this->applicant,
+					$resp[CstRequest::WORKSPACEID],
+					$resp[CstRequest::WORKFLOWID],
+					$resp[CstRequest::ENVELOPEID]
+				);
+				if (Helpers::getIfExists(CstRequest::SESSION, $resp) === CstRequest::OK) {
+					$resp[CstRequest::CODE] = 1;
+				} else {
+					$resp[CstRequest::CODE] = 0;
+				}
+			}
+
+			$returned = [
+				CstRequest::CODE	=> $resp[CstRequest::CODE],
+				CstRequest::DATA	=> $resp[CstRequest::DATA],
+				CstRequest::ERROR	=> null,
+				CstRequest::MESSAGE	=> $resp[CstRequest::MESSAGE],
+				// Specific for Designer
+				CstRequest::DESIGNERURL	=> $resp[CstRequest::DESIGNERURL],
+				CstRequest::ENVELOPEID	=> $resp[CstRequest::ENVELOPEID],
+				CstRequest::WORKFLOWID	=> $resp[CstRequest::WORKFLOWID],
+				CstRequest::WORKSPACEID	=> $resp[CstRequest::WORKSPACEID],
+			];
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+			$returned = [
+				CstRequest::CODE	=> 0,
+				CstRequest::DATA	=> null,
+				CstRequest::ERROR	=> $th->getCode(),
+				CstRequest::MESSAGE	=> CstException::SIGN_PROCESS,
+			];
+		}
+
+		return $returned;
+	}
+
+	/** ******************************************************************************************
+	 * PUBLIC
+	 ****************************************************************************************** */
+
+	/**
+	 * @NoAdminRequired
+	 */
+	public function signLocalAsyncAdvanced()
+	{
+		$returned = [];
+
+		try {
+			$signCheck = $this->rcdevsSignController->signLocalAsyncAdvanced();
+			if (Helpers::isIssueResponse($signCheck)) {
+				throw new Exception(
+					$signCheck[CstRequest::MESSAGE],
+					$signCheck[CstRequest::ERROR],
+				);
+			}
+
+			// Run process
+			// $returned = $this->commonSignLocalAsync(advanced: true);
+			$returned = $this->commonSignLocalAsync(new SignatureType(advanced: true));
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+			$returned = [
+				CstRequest::CODE	=> 0,
+				CstRequest::DATA	=> null,
+				CstRequest::ERROR	=> $th->getCode(),
+				CstRequest::MESSAGE	=> $th->getMessage(),
+			];
+		}
+
+		return $returned;
+	}
+
+	/**
+	 * @NoAdminRequired
+	 */
+	public function signLocalAsyncQualified()
+	{
+		$returned = [];
+
+		try {
+			$signCheck = $this->rcdevsSignController->signLocalAsyncQualified();
+			if (Helpers::isIssueResponse($signCheck)) {
+				throw new Exception(
+					$signCheck[CstRequest::MESSAGE],
+					$signCheck[CstRequest::ERROR],
+				);
+			}
+
+			// Run process
+			$returned = $this->commonSignLocalAsync(new SignatureType(qualified: true));
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+			$returned = [
+				CstRequest::CODE	=> 0,
+				CstRequest::DATA	=> null,
+				CstRequest::ERROR	=> $th->getCode(),
+				CstRequest::MESSAGE	=> $th->getMessage(),
+			];
+		}
+
+		return $returned;
+	}
+
+	/**
+	 * @NoAdminRequired
+	 */
+	public function signLocalAsyncStandard()
+	{
+		$returned = [];
+
+		try {
+			$signCheck = $this->rcdevsSignController->signLocalAsyncStandard();
+			if (Helpers::isIssueResponse($signCheck)) {
+				throw new Exception(
+					$signCheck[CstRequest::MESSAGE],
+					$signCheck[CstRequest::ERROR],
+				);
+			}
+
+			// Run process
+			$returned = $this->commonSignLocalAsync(new SignatureType(standard: true));
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+			$returned = [
+				CstRequest::CODE	=> 0,
+				CstRequest::DATA	=> null,
+				CstRequest::ERROR	=> $th->getCode(),
+				CstRequest::MESSAGE	=> $th->getMessage(),
+			];
+		}
+
+		return $returned;
 	}
 
 	/**
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 */
-	public function asyncExternalMobileSignSubmit($workspaceId = null, $workflowId = null, $envelopeId = null, $url = null)
+	public function signLocalAsyncSubmit($workspaceId = null, $workflowId = null, $envelopeId = null, $url = null)
 	{
 		try {
 			if (!is_null($workspaceId) && !is_null($workflowId) && !is_null($envelopeId) && !is_null($url)) {
-				$resp = $this->signService->asyncExternalMobileSignSubmit($workspaceId, $workflowId, $envelopeId);
+				$resp = $this->signService->signLocalAsyncSubmit(
+					$this->applicant,
+					$workspaceId,
+					$workflowId,
+					$envelopeId
+				);
 
 				return new RedirectResponse($url);
 			}
@@ -218,60 +301,18 @@ class SignController extends Controller
 	}
 
 	/**
-	 * @NoAdminRequired
-	 */
-	public function cancelSignRequest()
-	{
-		$resp = $this->signService->cancelSignRequest($this->request->getParam('envelopeId'), $this->userId);
-
-		return new JSONResponse([
-			'code' => $resp['code'],
-			'message' => $resp['message']
-		]);
-	}
-
-	/**
-	 * @NoAdminRequired
-	 */
-	public function forceDeletion()
-	{
-		$recipient = ($this->request->getParam('recipient') ? $this->request->getParam('recipient') : '');
-		$resp = $this->signService->cancelSignRequest($this->request->getParam('envelopeId'), $this->userId, true, $recipient);
-
-		return new JSONResponse([
-			'code' => strval($resp['code']),
-			'message' => $resp['message']
-		]);
-	}
-
-	/**
-	 * CAUTION: the @Stuff turns off security checks; for this page no admin is
-	 *          required and no CSRF check. If you don't know what CSRF is, read
-	 *          it up in the docs or you might create a security hole. This is
-	 *          basically the only required method to add this exemption, don't
-	 *          add it to any other method if you don't exactly know what it does
+	 * CAUTION:	the @Stuff turns off security checks; for this page no admin is
+	 *			required and no CSRF check. If you don't know what CSRF is, read
+	 *			it up in the docs or you might create a security hole. This is
+	 *			basically the only required method to add this exemption, don't
+	 *			add it to any other method if you don't exactly know what it does
 	 *
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 */
 	public function index()
 	{
-		Util::addScript('yumisign_nextcloud', 'yumisign_nextcloud-index');
-		return new TemplateResponse('yumisign_nextcloud', 'index');
-	}
-
-	/**
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 * @PublicPage
-	 * @CORS
-	 */
-	public function webhook()
-	{
-		$resp = $this->signService->webhook($this->request->getHeader("YUMISIGN-SIGNATURE"), $this->request->getParams());
-		return new JSONResponse([
-			'code'		=> strval(Utility::getArrayData($resp, 'code',    false)),
-			'message'	=>        Utility::getArrayData($resp, 'message', false),
-		]);
+		Util::addScript($this->configurationService->getAppId(), "{$this->configurationService->getAppId()}-index");
+		return new TemplateResponse($this->configurationService->getAppId(), 'index');
 	}
 }

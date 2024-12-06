@@ -1,4 +1,13 @@
 {
+	"name": "nextcloud/yumisign_nextcloud",
+	"description": "Sign documents with YumiSign through Nextcloud",
+	"version": "1.29.4",
+	"license": "agplv3",
+	"authors": [
+		{
+			"name": "RCDevs"
+		}
+	],
 	"autoload-dev": {
 		"psr-4": {
 			"OCP\\": "vendor/nextcloud/ocp/OCP"
@@ -6,7 +15,8 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"OCA\\YumiSignNxtC\\": "lib/"
+			"OCA\\YumiSignNxtC\\": "lib/",
+			"OCA\\RCDevs\\": "rcdevsBundle/"
 		}
 	},
 	"config": {
