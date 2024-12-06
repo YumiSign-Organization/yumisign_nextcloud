@@ -6,6 +6,14 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.30.2
+- Due to Doctrine bug which lowercase the column name, one of the migration scripts fails when database is case sensitive
+
+1.29.5
+- Due to Doctrine bug which lowercase the column name, one of the migration scripts fails when database is case sensitive
+
+1.28.7
+- Due to Doctrine bug which lowercase the column name, one of the migration scripts fails when database is case sensitive
 
 1.30.1
 - Packaging issue, composer.json was missing
