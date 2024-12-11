@@ -80,72 +80,46 @@ class Notification implements INotifier
 	{
 		try {
 			if ($notification->getApp() !== $this->configurationService->getAppId()) {
+				$this->logRCDevs->debug(vsprintf('Prepare notification : [%s] vs [%s]', [$notification->getApp(), $this->configurationService->getAppId()]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 				// Not my app
-				throw new \InvalidArgumentException();
+				// throw new \InvalidArgumentException();
+			} else {
+				$l = $this->factory->get($this->configurationService->getAppId(), $languageCode);
+
+				// $parameters = $notification->getSubjectParameters();
+				$notification->setIcon($this->urlGenerator->getAbsoluteURL($this->urlGenerator->imagePath($this->configurationService->getAppId(), $this->configurationService->getApplicationLogo())));
+
+				/**
+				 * Set rich subject, see https://github.com/nextcloud/server/issues/1706 for mor information
+				 * and https://github.com/nextcloud/server/blob/master/lib/public/RichObjectStrings/Definitions.php
+				 * for a list of defined objects and their parameters.
+				 */
+
+				$parameters = $notification->getSubjectParameters();
+				// If sign process returns a false/0 code, an Exception notification will be displayed
+				$subject = ($parameters[CstRequest::CODE]
+					? '{message}'
+					: "{$this->configurationService->getApplicationNameShort()} error; contact your administrator"
+				);
+
+				// Prepare the message for internationalization
+				$parameters[CstRequest::MESSAGE]	= $l->t($parameters[CstRequest::MESSAGE]);
+				$parameters[CstRequest::STATUS]		= $l->t($parameters[CstRequest::STATUS]);
+
+				// Fill the data for the notification
+				$subject = str_replace(['{code}', '{message}', '{status}'], $parameters, $subject);
+
+				$notification->setParsedSubject($subject);
+				$notification->setRichSubject($subject, [
+					$this->configurationService->getAppId() => [
+						'type'	=> 'highlight',
+						'id'	=> $notification->getObjectId(),
+						'name'	=> $this->configurationService->getApplicationName(),
+					]
+				]);
 			}
-			$l = $this->factory->get($this->configurationService->getAppId(), $languageCode);
-
-			// $parameters = $notification->getSubjectParameters();
-			$notification->setIcon($this->urlGenerator->getAbsoluteURL($this->urlGenerator->imagePath($this->configurationService->getAppId(), $this->configurationService->getApplicationLogo())));
-
-			/**
-			 * Set rich subject, see https://github.com/nextcloud/server/issues/1706 for mor information
-			 * and https://github.com/nextcloud/server/blob/master/lib/public/RichObjectStrings/Definitions.php
-			 * for a list of defined objects and their parameters.
-			 */
-
-			$parameters = $notification->getSubjectParameters();
-			// If sign process returns a false/0 code, an Exception notification will be displayed
-			$subject = ($parameters[CstRequest::CODE]
-				? '{message}'
-				: "{$this->configurationService->getApplicationNameShort()} error; contact your administrator"
-			);
-			
-			// Prepare the message for internationalization
-			$parameters[CstRequest::MESSAGE]	= $l->t($parameters[CstRequest::MESSAGE]);
-			$parameters[CstRequest::STATUS]		= $l->t($parameters[CstRequest::STATUS]);
-
-			// Fill the data for the notification
-			$subject = str_replace(['{code}', '{message}', '{status}'], $parameters, $subject);
-
-			$notification->setParsedSubject($subject);
-			$notification->setRichSubject($subject, [
-				$this->configurationService->getAppId() => [
-					'type'	=> 'highlight',
-					'id'	=> $notification->getObjectId(),
-					'name'	=> $this->configurationService->getApplicationName(),
-				]
-			]);
 
 			return $notification;
-		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			throw $th;
-		}
-	}
-
-	public function send(UsersListEntity $usersIdsList, NotificationEntity $notificationEntity): void
-	{
-		try {
-			$notification = $this->notificationManager->createNotification();
-			$notification
-				->setApp($this->configurationService->getAppId())
-				->setDateTime(new \DateTime())
-				->setObject($notificationEntity->idName, $notificationEntity->id)
-				->setSubject($this->configurationService->getApplicationName(), [
-					CstRequest::CODE	=> true,
-					CstRequest::MESSAGE	=> $notificationEntity->message,
-					CstRequest::STATUS	=> $notificationEntity->status,
-				])
-			;
-
-			/** @var UserEntity $unitUserId */
-			foreach ($usersIdsList->list as $unitUserId) {
-				if (!empty($unitUserId->getId())) {
-					$notification->setUser($unitUserId->getId());
-					$this->notificationManager->notify($notification);
-				}
-			}
 		} catch (\Throwable $th) {
 			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
