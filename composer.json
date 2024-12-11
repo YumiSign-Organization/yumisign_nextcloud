@@ -1,7 +1,7 @@
 {
 	"name": "nextcloud/yumisign_nextcloud",
 	"description": "Sign documents with YumiSign through Nextcloud",
-	"version": "1.28.7",
+	"version": "1.28.8",
 	"license": "agplv3",
 	"authors": [
 		{

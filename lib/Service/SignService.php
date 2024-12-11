@@ -23,28 +23,30 @@
 
 namespace OCA\YumiSignNxtC\Service;
 
+// RCDevs Bundle
+use \OCA\RCDevs\Entity\CurlEntity;
+use \OCA\RCDevs\Entity\NotificationEntity;
+use \OCA\RCDevs\Entity\UserEntity;
+use \OCA\RCDevs\Entity\UsersListEntity;
+use \OCA\RCDevs\Service\FileService;
+use \OCA\RCDevs\Utility\Helpers;
+use \OCA\RCDevs\Utility\LogRCDevs;
+use \OCA\RCDevs\Utility\Notification;
+use \OCA\RCDevs\Utility\RequestResponse;
+use \OCA\RCDevs\Utility\SignatureType;
+// YumiSign Specif
+use \OCA\YumiSignNxtC\Db\SignSession;
+use \OCA\YumiSignNxtC\Db\SignSessionMapper;
+use \OCA\YumiSignNxtC\Service\CurlService;
+use \OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
+use \OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
+use \OCA\YumiSignNxtC\Utility\Constantes\CstException;
+use \OCA\YumiSignNxtC\Utility\Constantes\CstFile;
+use \OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
+use \OCA\YumiSignNxtC\Utility\Constantes\CstStatus;
+// Nextcloud Core
 use DateTime;
 use Exception;
-use OC\URLGenerator;
-use OCA\RCDevs\Entity\CurlEntity;
-use OCA\RCDevs\Entity\NotificationEntity;
-use OCA\RCDevs\Entity\UserEntity;
-use OCA\RCDevs\Entity\UsersListEntity;
-use OCA\RCDevs\Service\FileService;
-use OCA\RCDevs\Utility\Helpers;
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCA\RCDevs\Utility\Notification;
-use OCA\RCDevs\Utility\RequestResponse;
-use OCA\RCDevs\Utility\SignatureType;
-use OCA\YumiSignNxtC\Db\SignSession;
-use OCA\YumiSignNxtC\Db\SignSessionMapper;
-use OCA\YumiSignNxtC\Service\CurlService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
-use OCA\YumiSignNxtC\Utility\Constantes\CstException;
-use OCA\YumiSignNxtC\Utility\Constantes\CstFile;
-use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
-use OCA\YumiSignNxtC\Utility\Constantes\CstStatus;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\Files\IRootFolder;
 use OCP\FilesMetadata\IFilesMetadataManager;
@@ -52,9 +54,11 @@ use OCP\IConfig;
 use OCP\IDateTimeFormatter;
 use OCP\IL10N;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\L10N\IFactory;
+use OCP\Notification\IManager as INotificationManager;
 use OCP\Notification\IManager;
 
 class SignService
@@ -64,45 +68,41 @@ class SignService
 	// Settings
 	private int			$asyncTimeout;
 	private int			$workspaceId;
-	// private string		$apiKey;
-	// private string		$description;
-	// private string		$serverUrl;
-	private string		$userId;
-	// private string		$workspaceName;
+	private string|null	$userId;
 	private UserEntity	$applicant;
 
 	public function __construct(
-		private	ConfigurationService	$configurationService,
-		private	CurlService				$curlService,
-		private	IConfig					$config,
-		private	IDateTimeFormatter		$formatter,
-		private	IFactory				$l10nFactory,
-		private	IFilesMetadataManager	$filesMetadataManager,
-		private	IL10N					$l,
-		private	IL10N					$l10n,
-		private	IRootFolder				$rootFolder,
-		private	IUserManager			$userManager,
-		private	IUserSession			$userSession,
-		private	LogRCDevs				$logRCDevs,
-		private	SignSessionMapper		$mapper,
-		private	URLGenerator			$urlGenerator,
-		private Notification			$notification,
-		string							$UserId,
+		private		ConfigurationService	$configurationService,
+		private		CurlService				$curlService,
+		private		IConfig					$config,
+		private		IDateTimeFormatter		$formatter,
+		private		IFactory				$l10nFactory,
+		private		IFilesMetadataManager	$filesMetadataManager,
+		private		IL10N					$l,
+		private		IL10N					$l10n,
+		private		IRootFolder				$rootFolder,
+		private		IUserManager			$userManager,
+		private		IUserSession			$userSession,
+		private		LogRCDevs				$logRCDevs,
+		private		SignSessionMapper		$mapper,
+		private		IURLGenerator 			$urlGenerator,
+		private		Notification			$notification,
+		protected	INotificationManager	$notificationManager,
+		protected	IURLGenerator			$url,
+		string|null							$UserId,
+
 	) {
-		// $this->apiKey			= $this->configurationService->getApiKey();
-		$this->asyncTimeout		= (int) $this->config->getAppValue($this->configurationService->getAppId(), 'async_timeout'); // in days
-		// $this->description		= $this->config->getAppValue($this->configurationService->getAppId(), 'description');
-		// $this->serverUrl		= $this->configurationService->getUrlApp();
-		$this->workspaceId		= intval($this->config->getAppValue($this->configurationService->getAppId(), 'workspace_id'));
-		// $this->workspaceName	= $this->config->getAppValue($this->configurationService->getAppId(), 'workspace_name');
-		$this->userId = $UserId;
+		$this->asyncTimeout	= (int) $this->config->getAppValue($this->configurationService->getAppId(), 'async_timeout'); // in days
+		$this->workspaceId	= intval($this->config->getAppValue($this->configurationService->getAppId(), 'workspace_id'));
+		$this->url			= $urlGenerator;
+		$this->userId		= $UserId;
 
 		$this->applicant = new UserEntity(
 			$this->config,
 			$this->rootFolder,
 			$this->userManager,
-			$this->userId,
-			null,
+			id: $this->userId,
+			emailAddress: null,
 		);
 
 		$accessToken = $config->getUserValue($this->userId, $this->configurationService->getAppId(), CstEntity::ACCESS_TOKEN, default: null);
@@ -528,6 +528,37 @@ class SignService
 		return $curlResponse;
 	}
 
+	private function send(
+		UsersListEntity $usersIdsList,
+		NotificationEntity $notificationEntity
+	): void {
+		try {
+			$notification = $this->notificationManager->createNotification();
+			$notification
+				->setApp($this->configurationService->getAppId())
+				->setDateTime(new \DateTime())
+				->setObject($notificationEntity->idName, $notificationEntity->id)
+				->setSubject($this->configurationService->getApplicationName(), [
+					CstRequest::CODE	=> true,
+					CstRequest::MESSAGE	=> $notificationEntity->message,
+					CstRequest::STATUS	=> $notificationEntity->status,
+				])
+				->setIcon($this->url->getAbsoluteURL($this->url->imagePath($this->configurationService->getAppId(), 'app-dark.svg')))
+			;
+
+			/** @var UserEntity $unitUserId */
+			foreach ($usersIdsList->list as $unitUserId) {
+				if (!empty($unitUserId->getId())) {
+					$notification->setUser($unitUserId->getId());
+					$this->notificationManager->notify($notification);
+				}
+			}
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			throw $th;
+		}
+	}
+
 	private function startWorkflow(
 		int $workflowId
 	): CurlEntity {
@@ -905,7 +936,16 @@ class SignService
 			$warningMsg = '';
 
 			// Get current document full path (filesystem)
-			$user = $this->userManager->get($userId);
+			// $user = $this->userManager->get($userId);
+			if (is_null($this->applicant->getId())) {
+				$this->applicant = new UserEntity(
+					$this->config,
+					$this->rootFolder,
+					$this->userManager,
+					id: $userId,
+					emailAddress: null,
+				);
+			};
 
 			if (array_key_exists('documents', $requestBody)) {
 				foreach ($requestBody['documents'] as $key => $document) {
@@ -1122,7 +1162,8 @@ class SignService
 			$resp[CstRequest::WORKFLOWID] = (isset($workflow[0]->error->message) ? $workflow[0]->error->message : $workflowId);
 		}
 
-		if ($workflow[0]->error === null) {
+		// if ($workflow[0]->error === null) {
+		if (is_null(Helpers::getIfExists(CstRequest::ERROR, $workflow[0], returnNull: true)) || is_null($workflow[0]->error)) {
 			// Update status in DB
 			$yumisignSessions = $this->mapper->findTransactions($envelopeId, CstEntity::ENVELOPE_ID);
 			foreach ($yumisignSessions as $yumisignSession) {
@@ -1160,7 +1201,8 @@ class SignService
 			status: $notificationStatus
 		);
 
-		$this->notification->send(
+		// $this->notification->send(
+		$this->send(
 			$usersIdsList,
 			$notificationEntity,
 		);
@@ -1186,7 +1228,8 @@ class SignService
 				status: $notificationStatus
 			);
 
-			$this->notification->send(
+			// $this->notification->send(
+			$this->send(
 				$usersIdsList,
 				$notificationEntity,
 			);

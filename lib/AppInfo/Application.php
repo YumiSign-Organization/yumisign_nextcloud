@@ -107,8 +107,8 @@ class Application extends App implements IBootstrap
 
 		// TODO	deprecatedd fcts: TBR
 		$server->getNavigationManager()->add(function () use ($server) {
-			/** @var IUser $user */
-			$user = $server->getUserSession()->getUser();
+			// /** @var IUser $user */
+			// $user = $server->getUserSession()->getUser();
 			return [
 				'id' => $this->appId,
 				'name' => $server->getL10N($this->appId)->t($this->appNamespace),
