@@ -6,6 +6,18 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.30.3
+- Fix on cron due to empty user ID
+- Fix on notifications during cron
+
+1.29.6
+- Fix on cron due to empty user ID
+- Fix on notifications during cron
+
+1.28.8
+- Fix on cron due to empty user ID
+- Fix on notifications during cron
+
 1.30.2
 - Due to Doctrine bug which lowercase the column name, one of the migration scripts fails when database is case sensitive
 

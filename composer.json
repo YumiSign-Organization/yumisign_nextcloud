@@ -1,4 +1,13 @@
 {
+	"name": "nextcloud/yumisign_nextcloud",
+	"description": "Sign documents with YumiSign through Nextcloud",
+	"version": "1.30.3",
+	"license": "agplv3",
+	"authors": [
+		{
+			"name": "RCDevs"
+		}
+	],
 	"autoload-dev": {
 		"psr-4": {
 			"OCP\\": "vendor/nextcloud/ocp/OCP"

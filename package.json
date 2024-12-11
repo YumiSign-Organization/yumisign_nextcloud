@@ -1,6 +1,6 @@
 {
 	"name": "yumisign_nextcloud",
-	"version": "1.30.2",
+	"version": "1.30.3",
 	"scripts": {
 		"build": "NODE_ENV=production webpack --progress --config webpack.js",
 		"dev": "NODE_ENV=development webpack --config webpack.js",
