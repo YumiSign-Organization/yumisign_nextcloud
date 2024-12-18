@@ -1,4 +1,14 @@
+![](https://docs.rcdevs.com/pictures/logo/yumisign/nextcloud/yumisign_169x169.png)
+
 # YumiSign for Nextcloud
+------
+
+This version is deprecated due to Nextcloud 28 EOL. For more information about it, please check this page
+https://github.com/nextcloud/server/wiki/Maintenance-and-Release-Schedule/
+					
+| Version code | Version name | Release date | End of life | Current version | Next version |
+| ------------ | ------------ | ------------ | ----------- | --------------- | ------------ |
+|     28         |Hub 7        |2023-12-12 | 2024-12 | 28.0.14 (2024-12-12) | End of Life |
 
 This YumiSign Plugin for Nextcloud allows users to digitally sign documents directly within the Nextcloud platform. With this plugin, you can securely sign PDFs, Word documents, and other supported file types with ease, ensuring the integrity and authenticity of your documents.
 
@@ -46,3 +56,13 @@ For more support and information:
 
 # Contact us
 Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.com) to purchase e-signature credits.
+
+**How to use it**
+
+You can download the application from the Nextcloud market at https://apps.nextcloud.com/apps/yumisign_nextcloud
+
+On this repository, please consult the different branches corresponding to the version of Nextcloud installed on your server.
+
+Do not hesitate to contact us at https://www.yumisign.com/contact-us
+
+![](https://docs.rcdevs.com/pictures/logo/rcdevs/nextcloud/rcdevs_115x54.png)
