@@ -1,0 +1,498 @@
+.rcdevsModalYMS .material-design-icon.close-icon>svg {
+	fill: var(--clrModalButtonClose);
+}
+
+rcdevsModalContent,
+rcdevsModalContent * {
+	font-family: Nunito, sans-serif !important;
+	display: flex;
+	color: var(--clrTextStandard);
+}
+
+rcdevsModalContent {
+	align-items: center;
+	flex-flow: column;
+	justify-content: center;
+	padding: 0px 50px 0px 50px;
+	height: 100%;
+}
+
+rcdevsLogo {
+	height: 44px;
+	left: 15px;
+	position: absolute;
+	top: 15px;
+}
+
+rcdevsLogo img {
+	object-fit: contain;
+}
+
+rcdevsModalTitle {
+	font-size: 30px;
+	font-weight: 700;
+}
+
+rcdevsModalMainContainer,
+rcdevsModalHeader,
+rcdevsSignProcess {
+	align-items: center;
+	flex-flow: column;
+	justify-content: center;
+	width: 100%;
+}
+
+rcdevsModalMainContainer {
+	height: inherit;
+}
+
+rcdevsModalHeader {
+	flex-flow: column;
+	padding-top: 50px;
+}
+
+rcdevsSuccessTick {
+	display: inline-block;
+	font-size: 150px;
+	color: green;
+	margin-top: 100px;
+	margin-bottom: 100px;
+}
+
+rcdevsSuccessTick img {
+	height: 120px;
+	margin: auto;
+}
+
+rcdevsRow.chosenFile {
+	flex-flow: row;
+}
+
+rcdevsyesrow.chosenFile:last-of-type {
+	margin-bottom: 20px;
+}
+
+rcdevsItem.filename {
+	font-weight: bold;
+	margin-left: 10px;
+	font-weight: 600;
+}
+
+rcdevsRecipientsChoices {
+	flex-flow: column;
+}
+
+recipientsSignleChoice {
+	flex-flow: row;
+	margin-bottom: 5px;
+}
+
+recipientsSignleChoice span {
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+recipientsSignleChoice input[type=text]::placeholder {
+	color: var(--color-input-placeholder);
+	opacity: 1;
+	/* Firefox */
+}
+
+recipientsSignleChoice input[type=text]::-ms-input-placeholder {
+	color: var(--color-input-placeholder);
+}
+
+DisplaySelfEmail,
+SelectNextcloudUsers,
+InputUsersEmails {
+	margin-left: auto;
+}
+
+DisplaySelfEmail,
+SelectNextcloudUsers .vs__dropdown-toggle,
+recipientsSignleChoice input[type=text] {
+	width: 444px;
+}
+
+DisplaySelfEmail,
+SelectNextcloudUsers .vs__dropdown-toggle,
+recipientsSignleChoice input[type=text] {
+	height: 44px !important;
+	width: 322px;
+	font-weight: bold;
+}
+
+DisplaySelfEmail input,
+DisplaySelfEmail input:disabled,
+SelectNextcloudUsers .vs__dropdown-toggle,
+SelectNextcloudUsers #rcdevsUsersFiltered ul *,
+recipientsSignleChoice input[type=text],
+SelectNextcloudUsers .v-select.select.vs--open .vs__dropdown-toggle,
+SelectNextcloudUsers .v-select.select:not(.vs--disabled, .vs--open) .vs__dropdown-toggle:hover,
+SelectNextcloudUsers .vs__dropdown-menu.vs__dropdown-menu--floating {
+	/* height: 40px!important; */
+	border-width: 1px;
+}
+
+DisplaySelfEmail input,
+DisplaySelfEmail input:disabled,
+DisplaySelfEmail input:hover,
+InputUsersEmails input,
+InputUsersEmails input:disabled,
+InputUsersEmails input:hover,
+SelectNextcloudUsers .vs__dropdown-toggle,
+SelectNextcloudUsers #rcdevsUsersFiltered ul *,
+recipientsSignleChoice input[type=text],
+SelectNextcloudUsers .v-select.select.vs--open .vs__dropdown-toggle,
+SelectNextcloudUsers .v-select.select:not(.vs--disabled, .vs--open) .vs__dropdown-toggle:hover,
+SelectNextcloudUsers .vs__dropdown-menu.vs__dropdown-menu--floating {
+	background-color: var(--clrInputBack) !important;
+	border-color: var(--color-input-border) !important;
+	color: var(--clrInputText) !important;
+	margin: 0 !important;
+	opacity: 1 !important;
+	font-weight: bold !important;
+}
+
+DisplaySelfEmail input:placeholder,
+InputUsersEmails input:placeholder,
+SelectNextcloudUsers input:placeholder {
+	color: var(--clrInputPlaceholder);
+}
+
+DisplaySelfEmail input,
+InputUsersEmails input,
+SelectNextcloudUsers .vs__dropdown-toggle,
+SelectNextcloudUsers #rcdevsUsersFiltered ul *,
+recipientsSignleChoice input[type=text],
+SelectNextcloudUsers .v-select.select.vs--open .vs__dropdown-toggle,
+SelectNextcloudUsers .vs__dropdown-menu.vs__dropdown-menu--floating {
+	color: var(--clrTextStandard);
+}
+
+DisplaySelfEmail input:disabled,
+DisplaySelfEmail input:hover,
+InputUsersEmails input:disabled,
+InputUsersEmails input:hover,
+SelectNextcloudUsers .v-select.select:not(.vs--disabled, .vs--open) .vs__dropdown-toggle:hover {
+	color: var(--clrInputText) !important;
+}
+
+SelectNextcloudUsers button.vs__open-indicator-button {
+	border-left: 1px solid var(--clrListboxSelectionDownArrayBorder);
+}
+
+SelectNextcloudUsers .material-design-icon.chevron-down-icon.vs__open-indicator>svg {
+	fill: var(--clrListboxSelectionDownArray);
+}
+
+#rcdevsUsersFiltered {
+	height: 40px !important;
+}
+
+DisplaySelfEmail {
+	align-items: center;
+}
+
+DisplaySelfEmail input,
+DisplaySelfEmail input:disabled {
+	border-color: var(--color-input-border) !important;
+	padding-left: 14px;
+}
+
+recipientsSignleChoice NcCheckboxRadioSwitch {
+	margin-right: auto;
+}
+
+rcdevsModalMainContainer .checkbox-content__icon.checkbox-radio-switch__icon * {
+	color: var(--clrChoiceNotSelected) !important;
+}
+
+rcdevsModalMainContainer .checkbox-content__icon.checkbox-radio-switch__icon.checkbox-content__icon--checked * {
+	color: var(--color-choice-selected) !important;
+}
+
+InputUsersEmails input {
+	height: auto !important;
+	margin: 0 !important;
+}
+
+rcdevsSignType {
+	border-color: var(--color-border-signTypes-enabled);
+	border-radius: 10px;
+	border-style: solid;
+	border-width: 1px;
+	flex-flow: row;
+	height: 70px;
+	margin: 0px 8px;
+	width: 193px;
+}
+
+rcdevssigntype:first-child {
+	margin-left: auto;
+	margin-right: 8px;
+}
+
+rcdevssigntype:last-child {
+	margin-left: 8px;
+	margin-right: auto;
+}
+
+rcdevsSignType.signDisabled {
+	border-color: var(--clrBorderSignTypesDisabled);
+}
+
+rcdevsSignType rcdevsItemsGrp {
+	flex-flow: column;
+	width: fit-content;
+}
+
+rcdevsSignType .checkbox-content.checkbox-radio-switch__content.checkbox-content-radio.checkbox-content--has-text {
+	background-color: transparent !important;
+}
+
+rcdevsSignType rcdevsItem {
+	line-height: initial;
+}
+
+rcdevsSignType rcdevsItem.rcdevsLabel {
+	color: var(--clrTextStandard);
+	font-size: 16px;
+	font-weight: bold;
+	letter-spacing: -0.7px;
+}
+
+rcdevsSignType rcdevsItem.rcdevsAdditional {
+	font-size: 13px;
+	letter-spacing: -0.2px;
+}
+
+hr.rcdevsSeparator {
+	border: 1px solid;
+	border-color: var(--color-separator-border);
+	width: 290px;
+}
+
+rcdevsModalFooter {
+	align-items: center;
+	flex-flow: column;
+	justify-content: center;
+	margin-top: auto;
+	width: 100%;
+	padding-bottom: 20px;
+}
+
+button {
+	height: fit-content;
+}
+
+button.closeModal,
+button.actionModal {
+	min-width: 150px;
+	width: fit-content;
+	justify-content: center;
+	align-items: center;
+}
+
+/* ALERTS */
+.alert {
+	border-radius: .25rem;
+	border: 1px solid transparent;
+	margin-bottom: 1rem;
+	padding: .75rem 1.25rem;
+	position: relative;
+}
+
+.alertDanger {
+	background-color: #f8d7da;
+	border-color: #f5c6cb;
+	color: #721c24;
+
+}
+
+#errorSettings,
+.disabledAction {
+	margin-top: 50px;
+	width: 400px;
+}
+
+.search-results {
+	position: absolute;
+	margin-top: 50px;
+}
+
+.search-results ul {
+	flex-flow: column;
+	border: 1px solid #ccc;
+	border-radius: 16px;
+	background-color: white;
+
+}
+
+rcdevsSuccess {
+	flex-flow: column;
+}
+
+rcdevsModalFooter button.submitTransaction {
+	background-color: var(--color-buttons-back);
+	color: var(--color-buttons-front);
+}
+
+rcdevsModalFooter button.actionModal {
+	background-color: var(--clrButtonActionBack);
+	color: var(--clrButtonActionFront);
+	border-color: var(--clrButtonActionBack);
+}
+
+rcdevsModalFooter button.closeModal {
+	background-color: var(--clrButtonCloseBack);
+	color: var(--clrButtonCloseFront);
+	border-color: var(--clrButtonCloseFront);
+}
+
+.rcdevsDisabled {
+	opacity: 0.3;
+}
+
+/* ++++++++++++++++++
+Messages banner
+++++++++++++++++++ */
+rcdevsRow#rcdevsMessageBanner {
+	position: absolute;
+	top: 169px;
+	display: none;
+}
+
+rcdevsMessageBanner,
+rcdevsCuteMessage {
+	border-style: solid;
+	border-width: 1px;
+}
+
+rcdevsMessageBanner {
+	border-radius: 6px;
+	cursor: pointer;
+	display: none;
+	flex-flow: row;
+}
+
+rcdevsIconMessage,
+rcdevsCuteMessage {
+	display: flex;
+}
+
+rcdevsCuteMessage {
+	align-items: center;
+	border-radius: 0 4px 4px 0;
+	min-height: var(--heightMessage);
+	min-width: 150px;
+	width: 100%;
+	padding-top: 4px;
+	padding-bottom: 4px;
+	padding-right: 4px;
+	/* color: var(--clrMessageText); */
+}
+
+rcdevsIconMessage {
+	background-position: center;
+	background-repeat: no-repeat;
+	padding: 6px;
+	width: 20px;
+	margin-left: 6px;
+}
+
+rcdevsMessageBanner[type|="error"]{
+	background-color: var(--clrMessageErrorBorder);
+	border-color: var(--clrMessageErrorBorder);
+	color: var(--clrMessageError);
+}
+
+rcdevsMessageBanner[type|="info"] {
+	background-color: var(--clrMessageInfoBorder);
+	border-color: var(--clrMessageInfoBorder);
+	color: var(--clrMessageInfo);
+}
+
+rcdevsMessageBanner[type|="success"] {
+	background-color: var(--clrMessageSuccessBorder);
+	border-color: var(--clrMessageSuccessBorder);
+	color: var(--clrMessageSuccess);
+}
+
+rcdevsMessageBanner[type|="warning"] {
+	background-color: var(--clrMessageWarningBorder);
+	border-color: var(--clrMessageWarningBorder);
+	color: var(--clrMessageWarning);
+}
+
+rcdevsMessageBanner[type|="error"] rcdevsIconMessage {
+	background-image: url("../assets/images/messages/message-error.svg");
+}
+
+rcdevsMessageBanner[type|="info"] rcdevsIconMessage {
+	background-image: url("../assets/images/messages/message-info.svg");
+}
+
+rcdevsMessageBanner[type|="success"] rcdevsIconMessage {
+	background-image: url("../assets/images/messages/message-success.svg");
+}
+
+rcdevsMessageBanner[type|="warning"] rcdevsIconMessage {
+	background-image: url("../assets/images/messages/message-warning.svg");
+}
+
+rcdevsMessageBanner[type|="error"] rcdevsIconMessage,
+rcdevsMessageBanner[type|="error"] rcdevsCuteMessage {
+	background-color: var(--clrMessageError);
+	border-color: var(--clrMessageError);
+}
+
+rcdevsMessageBanner[type|="info"] rcdevsIconMessage,
+rcdevsMessageBanner[type|="info"] rcdevsCuteMessage {
+	background-color: var(--clrMessageInfo);
+	border-color: var(--clrMessageInfo);
+}
+
+rcdevsMessageBanner[type|="success"] rcdevsIconMessage,
+rcdevsMessageBanner[type|="success"] rcdevsCuteMessage {
+	background-color: var(--clrMessageSuccess);
+	border-color: var(--clrMessageSuccess);
+}
+
+rcdevsMessageBanner[type|="warning"] rcdevsIconMessage,
+rcdevsMessageBanner[type|="warning"] rcdevsCuteMessage {
+	background-color: var(--clrMessageWarning);
+	border-color: var(--clrMessageWarning);
+}
+
+.rcdevsValid,
+.rcdevsInvalid {
+	border-radius: 4px;
+	border-style: solid;
+	border-width: 1px;
+	margin-left: 15px;
+	padding: 8px;
+}
+.rcdevsValid {
+	background-color: var(--clrMessageSuccess);
+	border-color: var(--clrMessageSuccessBorder);
+	color: var(--clrMessageSuccessBorder);
+}
+
+.rcdevsInvalid {
+	background-color: var(--clrMessageError);
+	border-color: var(--clrMessageErrorBorder);
+	color: var(--clrMessageErrorBorder);
+}
+
+
+
+
+.loaderWrap {
+	display: flex;
+	align-items: center;
+}
+
+.statusText {
+	margin-left: 10px;
+}

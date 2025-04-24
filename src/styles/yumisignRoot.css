@@ -1,0 +1,93 @@
+:root {
+	--color-border-signTypes-enabled: #EE831F;
+
+	/* Buttons */
+	--clrButtonCloseBack: transparent;
+	--clrButtonCloseFront: #EE831F;
+	--clrButtonActionBack: #EE831F;
+	--clrButtonActionFront: #FFFFFF;
+
+	/* Choices */
+	/* --clrChoiceNotSelected: #CDD6E1; */
+	--color-choice-selected: #EE831F;
+
+	--color-error-back: #F8D7DA;
+	--color-error-border: #F5C6CB;
+	--color-error-front: #721C24;
+
+	--color-input-border: #DEE4EB;
+	--color-input-placeholder: #BDC8D7;
+	--color-separator-border: #DEE4EB;
+	--color-success-back: #C6EFCE;
+	--color-success-front: #EE831F;
+	--color-warning: #C69347;
+
+	/* Messages */
+	--clrMessageError: #FCD9D8;
+	--clrMessageErrorBorder: #EF4136;
+	--clrMessageInfo: #D7EFF5;
+	--clrMessageInfoBorder: #39AFD1;
+	--clrMessageSuccess: #F3FCF3;
+	--clrMessageSuccessBorder: #01CB8A;
+	--clrMessageText: #526484;
+	--clrMessageWarning: #FDF1CF;
+	--clrMessageWarningBorder: #F4BD0E;
+	/* }
+
+body[data-theme-light] { */
+	--clrAppLogolabel: #000000;
+	--clrAppTagline: #526988;
+	--clrAppTitle: #344356;
+	--clrHeaderBorder: #DEE4EB;
+	--clrListItem: #526988;
+	--clrListItemSelected: #ED841F;
+
+	--clrInputPlaceholder: #BDC8D7;
+	--clrInputText: #344356;
+	--clrTextStandard: #344356;
+
+	/* Choices */
+	--clrBorderSignTypesDisabled: #DEE4EB;
+	--clrChoiceNotSelected: #CDD6E1;
+	--clrListboxSelectionDownArray: #526988;
+	--clrListboxSelectionDownArrayBorder: #DEE4EB;
+	--clrModalButtonClose: #222222;
+
+	/* Input */
+	--clrInputBack: #FFFFFF;
+
+	/* Listings */
+	--clrTransactionsListingHeader: #F4F6F8;
+	--clrTransactionsListingHeaderText: #8B9FB9;
+	--clrBorderRows: #DEE4EB;
+}
+
+
+body[data-theme-dark] {
+	--clrAppLogolabel: #FFFFFF;
+	--clrAppTagline: #FFFFFF;
+	--clrAppTitle: #FFFFFF;
+	--clrHeaderBorder: #FFFFFF;
+	--clrListItem: #FFFFFF;
+	--clrListItemSelected: #FFFFFF;
+
+	--clrInputPlaceholder: #526988;
+	--clrInputText: #FFFFFF;
+	--clrTextStandard: #FFFFFF;
+
+	/* Choices */
+	--clrBorderSignTypesDisabled: #2C394A;
+	--clrChoiceNotSelected: #3E4F67;
+	--clrListboxSelectionDownArray: #3E4F67;
+	--clrListboxSelectionDownArrayBorder: #2C394A;
+	--clrModalButtonClose: #3E4F67;
+
+	/* Input */
+	--clrInputBack: #171717;
+
+	/* Listings */
+	--clrTransactionsListingHeader: #F4F6F8;
+	--clrTransactionsListingHeaderText: #8B9FB9;
+	--clrBorderRows: #2C394A;
+
+}
