@@ -1,5 +1,5 @@
 import { appName, apiv1 } from './config.js';
-import { generateOcsUrl } from '@nextcloud/router';
+import { generateOcsUrl, generateUrl } from '@nextcloud/router';
 import Vue from 'vue';
 
 Vue.prototype.t = t;
@@ -9,6 +9,15 @@ export const getBasename = (chosenFile) => {
 		return chosenFile ? chosenFile._attributes.basename : '';
 	} catch (error) {
 		console.error(error.message);
+	}
+};
+
+export const getAppUrl = (apiUrl) => {
+	try {
+		return generateUrl(`apps/${appName}${apiUrl}`);
+	} catch (error) {
+		log.error(`Exception: [${error.message}]`);
+		return '';
 	}
 };
 

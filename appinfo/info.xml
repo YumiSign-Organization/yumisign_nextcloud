@@ -54,7 +54,7 @@ For more support and information:
 Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.com) to purchase e-signature credits.
 ]]></description>
 
-	<version>1.31.0</version>
+	<version>1.32.0</version>
 	<licence>agpl</licence>
 
 	<author mail="info@rcdevs.com">RCDevs</author>
@@ -81,8 +81,8 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
 	</screenshot>
 
 	<dependencies>
-		<php min-version="8.2"/>
-		<nextcloud min-version="31" max-version="31"/>
+		<php min-version="8.2" />
+		<nextcloud min-version="32" max-version="32" />
 	</dependencies>
 
 	<background-jobs>
@@ -90,7 +90,19 @@ Please contact YumiSign’ sales team [info@yumisign.com](mailto:info@yumisign.c
 	</background-jobs>
 
 	<settings>
-		<admin>OCA\YumiSignNxtC\Controller\SettingsController</admin>
+		<admin>OCA\YumiSignNxtC\Controller\AdminSettingsController</admin>
 		<admin-section>OCA\YumiSignNxtC\Settings\Admin\AdminSection</admin-section>
+		<personal>OCA\YumiSignNxtC\Controller\PersonalSettingsController</personal>
+		<personal-section>OCA\YumiSignNxtC\Settings\Personal\PersonalSection</personal-section>
 	</settings>
+
+	<navigations>
+		<navigation>
+			<name>YumiSign</name>
+			<route>yumisign_nextcloud.page.index</route>
+			<icon>app.svg</icon>
+			<order>5</order>
+		</navigation>
+	</navigations>
+
 </info>

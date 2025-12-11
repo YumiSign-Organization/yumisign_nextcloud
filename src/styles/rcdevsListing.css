@@ -1,7 +1,6 @@
 rcdevsAppContainer {
 	display: flex;
 	flex-flow: column;
-	font-family: Nunito;
 	font-weight: normal;
 	padding: 49px 20px;
 	color: var(--clrTextStandard);

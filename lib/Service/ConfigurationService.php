@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -29,12 +29,16 @@ use OCP\IConfig;
 
 class ConfigurationService extends RCDevsConfigurationService
 {
+	private		string		$scope;
+	private		string		$ttl;
 	private		string		$urlAppNoApi;
 	private		string 		$urlArchive;
 	private		string 		$urlCancel;
 	private		string 		$urlDebrief;
 	private		string 		$urlEnvelopes;
 	private		string 		$urlIntegAppsAuthorize;
+	private		string 		$urlOAuthAccess;
+	private		string 		$urlOAuthRefresh;
 	private		string 		$urlOpenAuthorization;
 	private		string 		$urlPreferences;
 	private		string 		$urlRecipients;
@@ -54,6 +58,11 @@ class ConfigurationService extends RCDevsConfigurationService
 		/**
 		 * Read config.xml file
 		 */
+		// Standard parameters
+		$this->scope					= rtrim($this->configXml['scope']);
+		$this->ttl						= rtrim($this->configXml['ttl']);
+
+		// URLs
 		$this->urlApp					= rtrim($this->configXml['url-app'], DIRECTORY_SEPARATOR);
 		$this->urlAppNoApi				= rtrim($this->configXml['url-app-no-api'], DIRECTORY_SEPARATOR);
 		$this->urlArchive				= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-archive'], DIRECTORY_SEPARATOR);
@@ -61,6 +70,8 @@ class ConfigurationService extends RCDevsConfigurationService
 		$this->urlDebrief				= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-debrief'], DIRECTORY_SEPARATOR);
 		$this->urlEnvelopes				= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-envelopes'], DIRECTORY_SEPARATOR);
 		$this->urlIntegAppsAuthorize	= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-integ-apps-authorize'], DIRECTORY_SEPARATOR);
+		$this->urlOAuthAccess			= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-oauth-access'], DIRECTORY_SEPARATOR);
+		$this->urlOAuthRefresh			= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-oauth-refresh'], DIRECTORY_SEPARATOR);
 		$this->urlOpenAuthorization		= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-open-authorization'], DIRECTORY_SEPARATOR);
 		$this->urlPreferences			= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-preferences'], DIRECTORY_SEPARATOR);
 		$this->urlRecipients			= DIRECTORY_SEPARATOR . ltrim($this->configXml['url-recipients'], DIRECTORY_SEPARATOR);
@@ -89,6 +100,24 @@ class ConfigurationService extends RCDevsConfigurationService
 	{
 		try {
 			return $this->config->getAppValue($this->getAppId(), 'client_secret');
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public function getScope(): string
+	{
+		try {
+			return $this->scope;
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public function getTTL(): int
+	{
+		try {
+			return intval($this->ttl);
 		} catch (\Throwable $th) {
 			throw $th;
 		}
@@ -165,6 +194,24 @@ class ConfigurationService extends RCDevsConfigurationService
 	{
 		try {
 			return $this->getUrlAppNoApi() . $this->urlIntegAppsAuthorize;
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public function getUrlOAuthAccess(): string
+	{
+		try {
+			return $this->getUrlApp() . $this->urlOAuthAccess;
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public function getUrlOAuthRefresh(): string
+	{
+		try {
+			return $this->getUrlApp() . $this->urlOAuthRefresh;
 		} catch (\Throwable $th) {
 			throw $th;
 		}

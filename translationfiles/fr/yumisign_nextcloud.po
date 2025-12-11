@@ -189,6 +189,12 @@
 	msgid	"Connection"
 	msgstr	"Connexion"
 
+	msgid	"Delete token"
+	msgstr	"Supprimer le jeton"
+
+	msgid	"Refresh token"
+	msgstr	"Rafraîchir le jeton"
+
 ### Settings (Personal) messages
 	msgstr	"Empty email address forbidden"
 	msgid	"Incorrect email format"
@@ -196,11 +202,29 @@
 	msgid	"Format d'email incorrect"
 	msgstr	"Adresse email vide interdite"
 
-	msgstr	"Empty password forbidden"
+	msgid	"Empty password forbidden"
 	msgstr	"Mot de passe vide interdit"
 
-	msgstr	"Not managed exception"
+	msgid	"Not managed exception"
 	msgstr	"Exception non gérée"
+
+	msgid	"Access Token registered"
+	msgstr	"Jeton d'accès enregistré"
+
+	msgid	"Missing Access Token"
+	msgstr	"Jeton d'accès manquant"
+
+	msgid	"Missing Refresh Token"
+	msgstr	"Jeton d'actualisation manquant"
+
+	msgid	"No token registered"
+	msgstr	"Aucun jeton enregistré"
+
+	msgid	"Token expired"
+	msgstr	"Jeton expiré"
+
+	msgid	"Token refreshed"
+	msgstr	"Jeton actualisé"
 
 
 

@@ -21,42 +21,45 @@
  *
  */
 
-namespace OCA\YumiSignNxtC\Controller;
+declare(strict_types=1);
 
-use OCA\RCDevs\Controller\UiController as RCDevsUiController;
+namespace OCA\YumiSignNxtC\Settings\Personal;
+
 use OCA\YumiSignNxtC\Service\ConfigurationService;
-use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
-use OCP\IRequest;
+use OCP\IL10N;
+use OCP\IURLGenerator;
+use OCP\Settings\IIconSection;
 
-class UiController extends Controller
+class PersonalSection implements IIconSection
 {
 	private	ConfigurationService	$configurationService;
-	private	RCDevsUiController	$rcdevsUiController;
 
 	public function __construct(
-		$AppName,
-		IRequest $request,
-		private IConfig $config,
+		private		IL10N			$l10nYmsPersonalSection,
+		private		IConfig			$config,
+		private		IURLGenerator	$url,
 	) {
-		parent::__construct($AppName, $request);
-
 		$this->configurationService = new ConfigurationService($config);
-
-		// Common RCDevs Settings controller
-		$this->rcdevsUiController = new RCDevsUiController(
-			$request,
-			$this->configurationService,
-			$AppName,
-		);
 	}
 
-	/**
-	 * @NoAdminRequired
-	 */
-	public function getItemsPerPage(): JSONResponse
+	public function getIcon(): string
 	{
-		return $this->rcdevsUiController->getItemsPerPage();
+		return $this->url->imagePath($this->configurationService->getAppId(), 'app-dark.svg');
+	}
+
+	public function getID(): string
+	{
+		return $this->configurationService->getAppId();
+	}
+
+	public function getName(): string
+	{
+		return $this->l10nYmsPersonalSection->t($this->configurationService->getApplicationName());
+	}
+
+	public function getPriority(): int
+	{
+		return 50;
 	}
 }

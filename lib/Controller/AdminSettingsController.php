@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -23,7 +23,7 @@
 
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\RCDevs\Controller\SettingsController as RCDevsSettingsController;
+use OCA\RCDevs\Controller\AdminSettingsController as RCDevsSettingsController;
 use OCA\RCDevs\Utility\Helpers;
 use OCA\RCDevs\Utility\LogRCDevs;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
@@ -41,14 +41,14 @@ use OCP\IRequest;
 use OCP\Settings\ISettings;
 use OCP\Util;
 
-class SettingsController extends Controller implements ISettings
+class AdminSettingsController extends Controller implements ISettings
 {
 	private	ConfigurationService		$configurationService;
 	private	RCDevsSettingsController	$rcdevsSettingsController;
-	private	string					$serverUrl;
-	private	string					$workspaceId;
-	private	string					$workspaceName;
-	private IConfig					$config;
+	private	string						$serverUrl;
+	private	string						$workspaceId;
+	private	string						$workspaceName;
+	private IConfig						$config;
 
 	public function __construct(
 		IConfig							$config,
