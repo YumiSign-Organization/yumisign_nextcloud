@@ -6,6 +6,13 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.32.0
+- Nextcloud 32 version
+- Add Personal Settings to use YumiSign OAuth API
+
+1.31.1
+- Add Personal Settings to use YumiSign OAuth API
+
 1.31.0
 - Nextcloud 31 version
 

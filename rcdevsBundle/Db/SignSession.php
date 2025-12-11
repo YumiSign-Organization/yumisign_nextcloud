@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -55,21 +55,4 @@ class SignSession extends Entity
 		$this->addType('mutex',			'string');
 		$this->addType('recipient',		'string');
 	}
-
-	// public function commonJsonSerialize(): array
-	// {
-	//	return [
-	//		'applicant_id'	=> $this->applicantId,
-	//		'change_status'	=> $this->changeStatus,
-	//		'created'		=> $this->created,
-	//		'expiry_date'	=> $this->expiryDate,
-	//		'file_id'		=> $this->fileId,
-	//		'file_path'		=> $this->filePath,
-	//		'global_status'	=> $this->globalStatus,
-	//		'id'			=> $this->id,
-	//		'msg_date'		=> $this->msgDate,
-	//		'mutex'			=> $this->mutex,
-	//		'recipient'		=> $this->recipient,
-	//	];
-	// }
 }

@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -36,11 +36,11 @@ use OCP\IUserSession;
 class PageController extends Controller
 {
 	public function __construct(
+		string								$appName,
 		IRequest							$request,
 		private		IConfig					$config,
 		private		IInitialState			$initialState,
 		private		IUserSession			$userSession,
-		string								$appName,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -52,7 +52,7 @@ class PageController extends Controller
 	 * @return TemplateResponse
 	 * @throws HintException
 	 */
-	public function index(): Response
+	public function index(): TemplateResponse
 	{
 		$appId = Application::APP_ID();
 		$response = new TemplateResponse($appId, 'index', [

@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -28,5 +28,10 @@
 class CstMessage extends RCDevsCstMessage
 {
 	public const ACCESS_TOKEN_REGISTERED	= 'Access Token registered';
+	public const MISSING_ACCESS_TOKEN		= 'Missing Access Token';
+	public const MISSING_REFRESH_TOKEN		= 'Missing Refresh Token';
 	public const NO_TOKEN_REGISTERED		= 'No token registered';
+	public const TOKEN_DELETED				= 'Token deleted';
+	public const TOKEN_EXPIRED				= 'Token expired';
+	public const TOKEN_REFRESHED			= 'Token refreshed';
 }

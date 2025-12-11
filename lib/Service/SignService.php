@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -81,12 +81,13 @@ class SignService
 		private		IL10N					$l,
 		private		IL10N					$l10n,
 		private		IRootFolder				$rootFolder,
+		private		IURLGenerator 			$urlGenerator,
 		private		IUserManager			$userManager,
 		private		IUserSession			$userSession,
 		private		LogRCDevs				$logRCDevs,
-		private		SignSessionMapper		$mapper,
-		private		IURLGenerator 			$urlGenerator,
 		private		Notification			$notification,
+		private		SignSessionMapper		$mapper,
+		private		TokenService			$tokenService,
 		protected	INotificationManager	$notificationManager,
 		protected	IURLGenerator			$url,
 		string|null							$UserId,
@@ -105,14 +106,23 @@ class SignService
 			emailAddress: null,
 		);
 
-		$accessToken = $config->getUserValue($this->userId, $this->configurationService->getAppId(), CstEntity::ACCESS_TOKEN, default: null);
+		if (empty($this->userId)) {
+			$accessToken = null;
+			$tokenExpired = true;
+		} else {
+			$accessToken	= $this->config->getUserValue($this->userId, $this->configurationService->getAppId(), CstEntity::ACCESS_TOKEN, default: null);
+			$tokenExpired	= $this->tokenService->isTokenExpired($this->userId);
+		}
 
-		if (is_null($accessToken)) { // Use API key
+		if (empty($accessToken) || $tokenExpired) { // Use API key
+			$this->logRCDevs->info('Use API key', __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$_credentialKey = "{$this->configurationService->getApiKeyName()}:{$this->configurationService->getApiKey()}";
 		} else { // Use Token instead
-			$_credentialKey = "{$this->configurationService->getTokenName()}:{$accessToken}";
+			$this->logRCDevs->info('Use Token instead', __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$_credentialKey = "{$this->configurationService->getTokenName()} {$accessToken}";
 		}
-		$this->curlService = new CurlService($config, $this->logRCDevs);
+
+		$this->curlService = new CurlService($this->config, $this->logRCDevs);
 		$this->curlService->addCredentialKey($_credentialKey);
 	}
 
@@ -346,6 +356,7 @@ class SignService
 			// Add steps
 			$curlSteps = $this->addSteps($workflow->id, $curlRecipients, $signatureType);
 			if (Helpers::isIssueResponse($curlSteps)) {
+				$this->logRCDevs->error(json_encode($curlSteps));
 				throw new Exception(CstException::STEPS);
 			}
 
@@ -565,7 +576,6 @@ class SignService
 	): CurlEntity {
 		$curlResponse = new CurlEntity();
 		try {
-			// $curlService = new CurlService($this->config, $this->logRCDevs, $this->configurationService->getApiKey());
 			$curlResponse = $this->curlService->startWorkflow($workflowId);
 		} catch (\Throwable $th) {
 			$curlResponse = new CurlEntity();
@@ -743,7 +753,7 @@ class SignService
 					foreach ($requestBody as $actualTransaction) {
 
 						switch (true) {
-								// Ban transactions which are invalid
+							// Ban transactions which are invalid
 							case array_key_exists(CstRequest::ERROR, $actualTransaction) && !is_null($actualTransaction[CstRequest::ERROR]):
 								switch ($actualTransaction[CstRequest::ERROR][CstRequest::CODE]) {
 									case CstException::ENVELOPE_NOT_FOUND:
@@ -765,7 +775,7 @@ class SignService
 										break;
 								}
 								break;
-								// Manage transactions which are valid
+							// Manage transactions which are valid
 							case array_key_exists(CstRequest::ERROR, $actualTransaction) && is_null($actualTransaction[CstRequest::ERROR]):
 								// Flag which indicated if we insert the array $currentTransaction after foreach loops
 								$isCurrentTransactionInserted = false;
@@ -937,7 +947,6 @@ class SignService
 			$warningMsg = '';
 
 			// Get current document full path (filesystem)
-			// $user = $this->userManager->get($userId);
 			if (is_null($this->applicant->getId())) {
 				$this->applicant = new UserEntity(
 					$this->config,
@@ -1025,7 +1034,6 @@ class SignService
 							throw new Exception("This url does not match to the Archives", 1);
 						}
 
-						// $curlService = new CurlService($this->config, $this->logRCDevs, $this->configurationService->getApiKey());
 						$temporaryFile = $this->curlService->getDocument($url)->getResponse();
 
 						/** @var File $createdFile */

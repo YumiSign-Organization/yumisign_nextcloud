@@ -1,6 +1,6 @@
 {
 	"name": "yumisign_nextcloud",
-	"version": "1.31.0",
+	"version": "1.31.1",
 	"scripts": {
 		"build": "NODE_ENV=production webpack --progress --config webpack.js",
 		"dev": "NODE_ENV=development webpack --config webpack.js",
@@ -36,6 +36,7 @@
 		"babel-plugin-add-module-exports": "^1.0.4",
 		"vue-loader": "^15.11.1",
 		"webpack": "^5.99.6",
+		"webpack-cli": "^6.0.1",
 		"webpack-node-externals": "^3.0.0"
 	},
 	"browser": {

@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -34,7 +34,7 @@ class CurlEntity implements JsonSerializable
 	private $header;
 	private $response;
 
-	public function __construct(CurlHandle $curlHandle = null)
+	public function __construct(CurlHandle|null $curlHandle = null)
 	{
 		if (!is_null($curlHandle)) {
 			$this->response		= curl_exec($curlHandle);

@@ -1,6 +1,6 @@
 <!--
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -32,8 +32,8 @@
 <script>
 import '../../styles/rcdevsListing.css';
 import {appName, baseUrl, timestamp} from '../../javascript/config.js';
-import {generateOcsUrl} from '@nextcloud/router';
-import {getOcsUrl, getT} from '../../javascript/utility.js';
+// import {generateOcsUrl} from '@nextcloud/router';
+import {getAppUrl, getT} from '../../javascript/utility.js';
 import axios from '@nextcloud/axios';
 import ConfirmDialogue from './CancelTransactionForce.vue';
 import moment from 'moment';
@@ -78,7 +78,7 @@ export default {
 			try {
 				return axios
 					.get(
-						getOcsUrl(urlApi),
+						getAppUrl(urlApi),
 						{},
 						{
 							cancelToken: this.source.token,
@@ -101,7 +101,7 @@ export default {
 				okButton: this.getT('Cancel'),
 			});
 			if (ok) {
-				let urlTransaction = generateOcsUrl(baseUrl + '/api/v1/transaction/cancel');
+				let urlTransaction = getAppUrl('/transaction/cancel');
 				axios
 					.put(urlTransaction, {
 						envelopeId,
@@ -136,7 +136,7 @@ export default {
 			this.requesting = true;
 			this.transactions = [];
 
-			let urlTransaction = generateOcsUrl(baseUrl + '/api/v1/transactions/pendings');
+			let urlTransaction = getAppUrl('/transactions/pendings');
 
 			// axios
 			// .get(
@@ -177,7 +177,7 @@ export default {
 			});
 
 			if (ok) {
-				let urlTransaction = generateOcsUrl(baseUrl + '/api/v1/transaction/deletion');
+				let urlTransaction = getAppUrl('/transaction/deletion');
 				axios
 					.put(urlTransaction, {
 						envelopeId,

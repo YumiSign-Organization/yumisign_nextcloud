@@ -1,6 +1,6 @@
 <!--
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -36,12 +36,29 @@
 				<!-- Connection button -->
 				<rcdevsSettingsRow>
 					<rcdevsSettingsItem class="rcdevsSettingsButton">
-						<button @click="connection()">
+						<button @click="connection()" :disabled="tokenOk">
 							{{ ui.button.connect }}
 						</button>
 					</rcdevsSettingsItem>
-					<rcdevsSettingsItem :class="{rcdevsValid: accessTokenRegistered, rcdevsInvalid: !accessTokenRegistered}">
+					<rcdevsSettingsItem v-if="displayMessageCheck" :class="{rcdevsValid: accessTokenRegistered, rcdevsInvalid: !accessTokenRegistered}">
 						{{ axiosSettings.message }}
+					</rcdevsSettingsItem>
+				</rcdevsSettingsRow>
+				<rcdevsSettingsRow>
+					<rcdevsSettingsItem class="rcdevsSettingsButton">
+						<button @click="axiosRefreshToken()" :disabled="!tokenOk">
+							{{ ui.button.refresh }}
+						</button>
+					</rcdevsSettingsItem>
+				</rcdevsSettingsRow>
+				<rcdevsSettingsRow>
+					<rcdevsSettingsItem class="rcdevsSettingsButton">
+						<button @click="axiosDeleteToken()" :disabled="!tokenOk">
+							{{ ui.button.delete }}
+						</button>
+					</rcdevsSettingsItem>
+					<rcdevsSettingsItem v-if="displayMessageDelete" :class="{rcdevsValid: accessTokenDeleted, rcdevsInvalid: !accessTokenDeleted}">
+						{{ axiosSettings.messageDelete }}
 					</rcdevsSettingsItem>
 				</rcdevsSettingsRow>
 			</rcdevsSettingsPartsContainer>
@@ -50,7 +67,7 @@
 </template>
 
 <script>
-import {getBasename, getOcsUrl, getT, isEmail, isEmptyString, isEnabled, isFilledString, isNotEmail, isValidResponse, log} from '../javascript/utility';
+import {getBasename, getAppUrl, getOcsUrl, getT, isEmail, isEmptyString, isEnabled, isFilledString, isNotEmail, isValidResponse, log} from '../javascript/utility';
 import {loadState} from '@nextcloud/initial-state';
 import $ from 'jquery';
 import axios from '@nextcloud/axios';
@@ -69,8 +86,9 @@ export default {
 			placeHolders: {},
 		};
 		this.apis = {
-			settingsAccessTokenCheck: '/settings/personal/token/check',
-			settingsAccessTokenRefreshToken: '/settings/personal/token',
+			oauthTokenCheck: '/oauth/token/check',
+			oauthTokenDelete: '/oauth/token/delete',
+			oauthTokenRefresh: '/oauth/token/refresh',
 		};
 		//#region UI texts
 		this.ui.messages.app.emailAddress = getT('Email address');
@@ -87,6 +105,8 @@ export default {
 		this.ui.messages.banner.info = 'info';
 
 		this.ui.button.connect = getT('Connection');
+		this.ui.button.delete = getT('Delete token');
+		this.ui.button.refresh = getT('Refresh token');
 
 		this.ui.placeHolders.emailAddress = getT('Email used to connect to YumiSign');
 		this.ui.placeHolders.password = getT('Associated password');
@@ -94,10 +114,14 @@ export default {
 
 		return {
 			//#region Returned values
+			accessTokenDeleted: null,
 			accessTokenRegistered: null,
 			code: null,
+			displayMessageCheck: true,
+			displayMessageDelete: false,
 			redirectUri: null,
 			state: null,
+			tokenOk: false,
 
 			axiosSettings: {
 				abortCtrl: null,
@@ -105,57 +129,20 @@ export default {
 				success: false,
 				error: false,
 				message: null,
+				messageDelete: null,
 			},
 			//#endregion
 		};
 	},
 
 	created() {
-		const {protocol, host, pathname} = window.location;
-		this.redirectUri = `${protocol}//${host}${pathname}`;
-
-		const urlParams = new URLSearchParams(window.location.search);
-		const params = {};
-		for (const [key, value] of urlParams) {
-			if (key === 'code') {
-				this.code = value;
-			}
-			if (key === 'state') {
-				this.state = value;
-			}
-			params[key] = value;
-		}
-		log.debug(`Parameters in URL ${JSON.stringify(params)}`);
-
-		// If code && state are not null, call YumiSign server to retrieve access_token and refresh_token
-		if (this.code == null || this.state == null) {
-			/**
-			 * First step on Nextcloud server, the user opens the Personal Settings page
-			 * Check if Token is saved in NxcDB
-			 *
-			 * @step: Sending users to authorize
-			 * @reference: https://docs.yumisign.com/authorization/oauth.html#step-1-sending-users-to-authorize
-			 */
-			this.axiosAccessTokenCheck();
-		}
-		// Check if a token is already registered
-		else {
-			// The code AND the state are not null
-			/**
-			 * Second step on Nextcloud server, returned from YumiSign login page (Users are redirected to your server with a verification code, https://docs.yumisign.com/authorization/oauth.html#step-2-users-are-redirected-to-your-server-with-a-verification-code)
-			 * Call the YumiSign server through Nextcloud server
-			 * 
-			 * @step: Exchanging a verification code for an access token
-			 * @reference: https://docs.yumisign.com/authorization/oauth.html#step-3-exchanging-a-verification-code-for-an-access-token
-			 */
-			this.axiosAccessTokenRefreshToken();
-		}
+		this.axiosAccessTokenCheck();
 	},
 
 	beforeMount() {
 		//#region Initial Settings
 		const initialSettings = loadState(appName, 'initialSettings');
-		
+
 		this.apiKey = initialSettings.apiKey;
 		this.asyncTimeout = initialSettings.asyncTimeout;
 		this.clientId = initialSettings.clientId;
@@ -185,59 +172,19 @@ export default {
 	},
 
 	methods: {
-		axiosAccessTokenRefreshToken: function () {
-			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosSettings = this.initAxios();
-
-				// log.info(`Contact server to access APIs with Token`);
-
-				axios
-					.post(getOcsUrl(this.apis.settingsAccessTokenRefreshToken), {
-						redirect_uri: this.redirectUri,
-						code: this.code,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						// Check results
-						if (!isValidResponse(response)) {
-							throw new Error('Token initialization failed');
-						}
-						this.axiosSettings.success = true;
-						// Apply values
-						this.accessTokenRegistered = isEnabled(response.data.code);
-						this.axiosSettings.message = response.data.message;
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosSettings.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosSettings.message = exception.message;
-						}
-
-						this.axiosSettings.error = true;
-						this.writeMessageBanner(this.axiosSettings.message, this.ui.messages.banner.error);
-						// Apply values
-						this.accessTokenRegistered = false;
-						this.axiosSettings.message = this.axiosSettings.message;
-					})
-					.finally(() => {
-						this.axiosSettings.inProgress = false;
-					});
-			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
-			}
-		},
-
 		axiosAccessTokenCheck: function () {
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				this.axiosSettings = this.initAxios();
 
-				// log.info(`Contact server to check if token is registered`);
+				// log.info(`Contact server to check if access token is registered`);
+
+				// Hide/Show messages
+				this.displayMessageCheck = true;
+				this.displayMessageDelete = false;
+
 				axios
-					.get(getOcsUrl(this.apis.settingsAccessTokenCheck), {
+					.get(getAppUrl(this.apis.oauthTokenCheck), {
 						signal: this.axiosSettings.abortCtrl.signal,
 					})
 					.then((response) => {
@@ -250,14 +197,103 @@ export default {
 						this.axiosSettings.success = true;
 						// Apply values
 						this.accessTokenRegistered = response.data.data.tokenRegistered;
-						this.axiosSettings.message = response.data.message;
-						this.state = response.data.data.state;
+						this.tokenOk = response.data.data.tokenRegistered;
+						this.axiosSettings.message = getT(response.data.message);
+						this.axiosSettings.messageDelete = '';
 					})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
-							this.axiosSettings.message = this.ui.axios.requestCancelled;
+							this.axiosSettings.message = getT(this.ui.axios.requestCancelled);
 						} else {
-							this.axiosSettings.message = exception.message;
+							this.axiosSettings.message = getT(exception.message);
+						}
+
+						this.axiosSettings.error = true;
+						// Apply values
+					})
+					.finally(() => {
+						this.axiosSettings.inProgress = false;
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosDeleteToken: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosSettings = this.initAxios();
+
+				// Hide/Show messages
+				this.displayMessageCheck = false;
+				this.displayMessageDelete = true;
+
+				axios
+					.get(getAppUrl(this.apis.oauthTokenDelete), {
+						signal: this.axiosSettings.abortCtrl.signal,
+					})
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+
+						// Check results
+						if (!isValidResponse(response)) {
+							throw new Error('Deleting failed');
+						}
+						this.axiosSettings.success = true;
+						// Apply values
+						this.accessTokenDeleted = response.data.data.tokenDeleted;
+						this.tokenOk = response.data.data.tokenRegistered;
+						this.axiosSettings.messageDelete = getT(response.data.message);
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosSettings.messageDelete = getT(this.ui.axios.requestCancelled);
+						} else {
+							this.axiosSettings.messageDelete = getT(exception.message);
+						}
+
+						this.axiosSettings.error = true;
+						// Apply values
+					})
+					.finally(() => {
+						this.axiosSettings.inProgress = false;
+					});
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
+		axiosRefreshToken: function () {
+			try {
+				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.axiosSettings = this.initAxios();
+
+				// Hide/Show messages
+				this.displayMessageCheck = true;
+				this.displayMessageDelete = false;
+
+				axios
+					.get(getAppUrl(this.apis.oauthTokenRefresh), {
+						signal: this.axiosSettings.abortCtrl.signal,
+					})
+					.then((response) => {
+						log.debug(`Response for ${JSON.stringify(response.data)}`);
+
+						// Check results
+						if (!isValidResponse(response)) {
+							throw new Error('Checking failed');
+						}
+						this.axiosSettings.success = true;
+						// Apply values
+						this.accessTokenRegistered = response.data.data.tokenRegistered;
+						this.tokenOk = response.data.data.tokenRegistered;
+						this.axiosSettings.message = getT(response.data.message);
+					})
+					.catch((exception) => {
+						if (axios.isCancel(exception)) {
+							this.axiosSettings.message = getT(this.ui.axios.requestCancelled);
+						} else {
+							this.axiosSettings.message = getT(exception.message);
 						}
 
 						this.axiosSettings.error = true;
@@ -273,7 +309,9 @@ export default {
 
 		connection: function () {
 			try {
-				window.location.replace(`${this.ymsApiAuthorize}?&client_id=${this.clientId}&redirect_uri=${this.redirectUri}&response_type=code&state=${this.state}`);
+				const connectUrl = getAppUrl(this.ymsApiAuthorize);
+				log.debug(`Connect to ${connectUrl}`);
+				window.location.replace(connectUrl);
 			} catch (exception) {
 				log.error(`[${this.getFunctionName()}] ${exception}`);
 				writeMessageBanner(getT(exception.message), ui.messages.banner.error);

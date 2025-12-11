@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -25,7 +25,6 @@ namespace OCA\YumiSignNxtC\Controller;
 
 use OCA\RCDevs\Utility\LogRCDevs;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
-use OCA\YumiSignNxtC\Service\SettingsService;
 use OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -56,7 +55,6 @@ class PersonalSettingsController extends Controller implements ISettings
 		private	IInitialState		$initialState,
 		private	IURLGenerator		$urlGenerator,
 		private	IUserSession		$userSession,
-		private	SettingsService		$settingsService,
 		private LogRCDevs			$logRCDevs,
 		string						$UserId,
 		string						$AppName,
@@ -71,28 +69,17 @@ class PersonalSettingsController extends Controller implements ISettings
 		$this->configurationService = new ConfigurationService($config);
 
 		$this->redirectUri		= $request->getParam('redirect_uri');
-		$this->code		= $request->getParam('code');
+		$this->code				= $request->getParam('code');
 		$this->serverUrl		= $this->configurationService->getUrlApp() ?? '';
 		$this->state			= $request->getParam('state');
-	}
-
-	public function accessTokenRefreshToken(): array
-	{
-		return $this->settingsService->accessTokenRefreshToken($this->code, $this->redirectUri);
-	}
-
-	public function checkAccessToken(): array
-	{
-		return $this->settingsService->checkAccessToken();
 	}
 
 	public function getForm(): TemplateResponse
 	{
 		$initialSettings = [
-			// 'clientId'	=> $this->config->getAppValue($this->configurationService->getClientId(), 'client_id'),
 			'clientId'			=> $this->configurationService->getClientId(),
 			'state'				=> hash_hmac(CstCommon::SHA256, $this->currentUserId . intval(time()) . md5(intval(time())), md5(intval(time()))),
-			'ymsApiAuthorize'	=> $this->configurationService->getUrlIntegAppsAuthorize(),
+			'ymsApiAuthorize'	=> '/oauth/connect',
 		];
 		$this->initialState->provideInitialState('initialSettings', $initialSettings);
 		$this->logRCDevs->debug(sprintf('Initial Personal Settings provided : [%s]', json_encode($initialSettings)));
@@ -104,11 +91,12 @@ class PersonalSettingsController extends Controller implements ISettings
 
 	public function getPriority(): int
 	{
-		return 0;
+		return 55;
 	}
 
 	public function getSection(): string
 	{
 		return $this->configurationService->getAppId();
+		// return 'yumisign';
 	}
 }

@@ -1,6 +1,6 @@
 <!--
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -99,8 +99,8 @@
 <script>
 import '../../styles/rcdevsListing.css';
 import {appName, baseUrl, nbItemsPerPage, timestamp} from '../../javascript/config.js';
-import {generateFilePath, generateOcsUrl} from '@nextcloud/router';
-import {getOcsUrl, getT, isIssueResponse, isValidResponse, log} from '../../javascript/utility.js';
+import {generateFilePath} from '@nextcloud/router';
+import {getAppUrl, getT, isIssueResponse, isValidResponse, log} from '../../javascript/utility.js';
 import axios from '@nextcloud/axios';
 import ConfirmDialogue from './CancelTransactionForce.vue';
 import moment from 'moment';
@@ -196,7 +196,7 @@ export default {
 				log.info(`Contact server to get nb items per page (${this.status})`);
 
 				axios
-					.get(getOcsUrl(this.apis.uiItemsPage), {
+					.get(getAppUrl(this.apis.uiItemsPage), {
 						signal: this.axiosSrvRequest.abortCtrl.signal,
 					})
 					.then((response) => {
@@ -257,7 +257,7 @@ export default {
 				log.info(`Contact server to get Transactions (${this.status})`);
 
 				axios
-					.get(getOcsUrl(`${this.apis.transactions}/${this.status}?nbItems=${this.NB_ITEMS_PER_PAGE}`), {
+					.get(getAppUrl(`${this.apis.transactions}/${this.status}?nbItems=${this.NB_ITEMS_PER_PAGE}`), {
 						signal: this.axiosSrvRequest.abortCtrl.signal,
 					})
 					.then((response) => {
@@ -322,7 +322,7 @@ export default {
 				okButton: this.getT('Cancel'),
 			});
 			if (ok) {
-				let urlTransaction = generateOcsUrl(baseUrl + '/api/v1/transaction/cancel');
+				let urlTransaction = getAppUrl('/transaction/cancel');
 				axios
 					.put(urlTransaction, {
 						envelopeId,
@@ -360,7 +360,7 @@ export default {
 			this.requesting = true;
 			this.transactions = [];
 
-			let urlTransaction = generateOcsUrl(baseUrl + '/api/v1/transactions/' + this.status);
+			let urlTransaction = getAppUrl('/transactions/' + this.status);
 
 			axios({
 				url: `${urlTransaction}?&page=${pageNum - 1}&nbItems=${this.NB_ITEMS_PER_PAGE}`,
@@ -397,7 +397,7 @@ export default {
 			});
 
 			if (ok) {
-				let urlTransaction = generateOcsUrl(baseUrl + '/api/v1/transaction/deletion');
+				let urlTransaction = getAppUrl('/transaction/deletion');
 				axios
 					.put(urlTransaction, {
 						envelopeId,

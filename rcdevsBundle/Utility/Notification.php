@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -80,7 +80,7 @@ class Notification implements INotifier
 	{
 		try {
 			if ($notification->getApp() !== $this->configurationService->getAppId()) {
-				$this->logRCDevs->debug(vsprintf('Prepare notification : [%s] vs [%s]', [$notification->getApp(), $this->configurationService->getAppId()]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+				// $this->logRCDevs->debug(vsprintf('Prepare notification : [%s] vs [%s]', [$notification->getApp(), $this->configurationService->getAppId()]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 				// Not my app
 				// throw new \InvalidArgumentException();
 			} else {

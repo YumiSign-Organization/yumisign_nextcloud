@@ -4,10 +4,10 @@ const webpackRules = require('@nextcloud/webpack-vue-config/rules')
 const BabelLoaderExcludeNodeModulesExcept = require('babel-loader-exclude-node-modules-except')
 
 webpackConfig.entry = {
-	'admin-settings': path.join(__dirname, 'src', 'mainAdminSettings.js'),
-	// 'personal-settings': path.join(__dirname, 'src', 'mainPersonalSettings.js'),
-	main: path.join(__dirname, 'src', 'main.js'),
-	loader: path.join(__dirname, 'src', 'mainLoader.js'),
+	main:					path.join(__dirname, 'src', 'main.js'),
+	'personal-settings':	path.join(__dirname, 'src', 'mainPersonalSettings.js'),
+	'admin-settings':		path.join(__dirname, 'src', 'mainAdminSettings.js'),
+	loader:					path.join(__dirname, 'src', 'mainLoader.js'),
 }
 
 webpackConfig.output.assetModuleFilename = '[name][ext]?v=[contenthash]'

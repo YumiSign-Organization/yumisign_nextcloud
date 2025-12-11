@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -27,21 +27,104 @@ $requirements = [
 
 return [
 	'routes' => [
+		/*
+		OAUTH
+		*/
 		[
-			'name'	=> 'Page#index',
-			'url'	=> '/',
+			'name'	=> 'oauth#connect',
+			'url'	=> '/oauth/connect',
+			'verb'	=> 'GET'
+		],
+		[
+			'name'	=> 'oauth#callback',
+			'url'	=> '/oauth/callback',
+			'verb'	=> 'GET'
+		],
+		[
+			'name'	=> 'oauth#checkAccessToken',
+			'url'	=> '/oauth/token/check',
 			'verb'	=> 'GET',
 		],
 		[
-			'name'	=> 'Sign#webhook',
+			'name'	=> 'oauth#deleteAccessToken',
+			'url'	=> '/oauth/token/delete',
+			'verb'	=> 'GET',
+		],
+		[
+			'name'	=> 'oauth#refreshToken',
+			'url'	=> '/oauth/token/refresh',
+			'verb'	=> 'GET'
+		],
+		[
+			'name'	=> 'page#index',
+			'url'	=> '/',
+			'verb'	=> 'GET',
+		],
+
+		/*
+		TRANSACTIONS
+		*/
+		// Transactions according to status
+		[
+			'name'	=> 'transactions#getTransactionsCompleted',
+			'url'	=> '/transactions/completed',
+			'verb'	=> 'GET',
+		],
+		[
+			'name'	=> 'transactions#getTransactionsDeclined',
+			'url'	=> '/transactions/declined',
+			'verb'	=> 'GET',
+		],
+		[
+			'name'	=> 'transactions#getTransactionsExpired',
+			'url'	=> '/transactions/expired',
+			'verb'	=> 'GET',
+		],
+		[
+			'name'	=> 'transactions#getTransactionsFailed',
+			'url'	=> '/transactions/failed',
+			'verb'	=> 'GET',
+		],
+		[
+			'name'	=> 'transactions#getTransactionsPending',
+			'url'	=> '/transactions/pending',
+			'verb'	=> 'GET',
+		],
+		// Operations on existing transactions
+		[
+			'name'	=> 'transactions#cancelTransaction',
+			'url'	=> '/transaction/cancel',
+			'verb'	=> 'PUT',
+		],
+		[
+			'name'	=> 'transactions#deleteTransaction',
+			'url'	=> '/transaction/deletion',
+			'verb'	=> 'PUT',
+		],
+
+		/*
+		SIGNATURES
+		*/
+		[
+			'name'	=> 'sign#webhook',
 			'url'	=> '/webhook',
 			'verb'	=> 'POST'
 		],
 		[
-			'name'	=> 'Sign#signLocalAsyncSubmit',
+			'name'	=> 'sign#signLocalAsyncSubmit',
 			'url'	=> '/sign/mobile/async/external/submit',
 			'verb'	=> 'GET',
 		],
+
+		/*
+		UI
+		*/
+		[
+			'name'	=> 'ui#getItemsPerPage',
+			'url'	=> '/ui/items/page',
+			'verb'	=> 'GET',
+		],
+
 
 	],
 	'ocs' => [
@@ -68,128 +151,54 @@ return [
 		],
 
 		/*
-		TRANSACTIONS
-		*/
-		// Transactions according to status		
-		[
-			'name'			=> 'Transactions#getTransactionsCompleted',
-			'url'			=> '/api/{apiVersion}/transactions/completed',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'Transactions#getTransactionsDeclined',
-			'url'			=> '/api/{apiVersion}/transactions/declined',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'Transactions#getTransactionsExpired',
-			'url'			=> '/api/{apiVersion}/transactions/expired',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'Transactions#getTransactionsFailed',
-			'url'			=> '/api/{apiVersion}/transactions/failed',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'Transactions#getTransactionsPending',
-			'url'			=> '/api/{apiVersion}/transactions/pending',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-		// Operations on existing transactions
-		[
-			'name'			=> 'Transactions#cancelTransaction',
-			'url'			=> '/api/{apiVersion}/transaction/cancel',
-			'verb'			=> 'PUT',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'Transactions#deleteTransaction',
-			'url'			=> '/api/{apiVersion}/transaction/deletion',
-			'verb'			=> 'PUT',
-			'requirements'	=> $requirements,
-		],
-
-		/*
-		UI
+		SETTINGS - ADMIN
 		*/
 		[
-			'name'			=> 'Ui#getItemsPerPage',
-			'url'			=> '/api/{apiVersion}/ui/items/page',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-
-		/*
-		SETTINGS
-		*/
-		[
-			'name'			=> 'Settings#checkCronStatus',
+			'name'			=> 'AdminSettings#checkCronStatus',
 			'url'			=> '/api/{apiVersion}/settings/check/cron',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#checkEnabledSign',
+			'name'			=> 'AdminSettings#checkEnabledSign',
 			'url'			=> '/api/{apiVersion}/settings/check/app',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#checkSignTypes',
+			'name'			=> 'AdminSettings#checkSignTypes',
 			'url'			=> '/api/{apiVersion}/settings/check/types',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#checkServerUrl',
+			'name'			=> 'AdminSettings#checkServerUrl',
 			'url'			=> '/api/{apiVersion}/settings/check',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#checkWorkspaceId',
+			'name'			=> 'AdminSettings#checkWorkspaceId',
 			'url'			=> '/api/{apiVersion}/settings/check/workspace/id',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#checkWorkspaceName',
+			'name'			=> 'AdminSettings#checkWorkspaceName',
 			'url'			=> '/api/{apiVersion}/settings/check/workspace/name',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#resetJob',
+			'name'			=> 'AdminSettings#resetJob',
 			'url'			=> '/api/{apiVersion}/settings/job/reset',
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
-			'name'			=> 'Settings#saveSettings',
+			'name'			=> 'AdminSettings#saveSettings',
 			'url'			=> '/api/{apiVersion}/settings/save',
 			'verb'			=> 'POST',
-			'requirements'	=> $requirements,
-		],
-
-		/*
-		SETTINGS - PERSONAL
-		*/
-		[
-			'name'			=> 'PersonalSettings#accessTokenRefreshToken',
-			'url'			=> '/api/{apiVersion}/settings/personal/token',
-			'verb'			=> 'POST',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'PersonalSettings#checkAccessToken',
-			'url'			=> '/api/{apiVersion}/settings/personal/token/check',
-			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 

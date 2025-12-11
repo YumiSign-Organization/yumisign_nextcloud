@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -32,17 +32,16 @@ use OCP\Settings\IIconSection;
 class AdminSection implements IIconSection
 {
 	private	ConfigurationService	$configurationService;
-	private	IURLGenerator		$url;
 
 	public function __construct(
-		private			IL10N		$l10nYmsAdminSection,
-		private			IConfig		$config,
-		IURLGenerator				$url,
+		private	IL10N			$l10nYmsAdminSection,
+		private	IConfig			$config,
+		private	IURLGenerator	$url,
 	) {
 		$this->configurationService = new ConfigurationService($config);
 
-		$this->url = $url;
-		$this->l10nYmsAdminSection = $l10nYmsAdminSection;
+		// $this->url = $url;
+		// $this->l10nYmsAdminSection = $l10nYmsAdminSection;
 	}
 
 	/**

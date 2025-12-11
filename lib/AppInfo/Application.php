@@ -2,7 +2,7 @@
 
 /**
  *
- * @copyright Copyright (c) 2024, RCDevs (info@rcdevs.com)
+ * @copyright Copyright (c) 2025, RCDevs (info@rcdevs.com)
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -106,18 +106,18 @@ class Application extends App implements IBootstrap
 		$this->registerNotifier($server);
 
 		// TODO	deprecatedd fcts: TBR
-		$server->getNavigationManager()->add(function () use ($server) {
-			// /** @var IUser $user */
-			// $user = $server->getUserSession()->getUser();
-			return [
-				'id' => $this->appId,
-				'name' => $server->getL10N($this->appId)->t($this->appNamespace),
-				'href' => $server->getURLGenerator()->linkToRouteAbsolute($this->appId . '.Page.index'),
-				'icon' => $server->getURLGenerator()->imagePath($this->appId, 'app.svg'),
-				'order' => 3,
-				'type' => 'link',
-			];
-		});
+		// $server->getNavigationManager()->add(function () use ($server) {
+		// 	// /** @var IUser $user */
+		// 	// $user = $server->getUserSession()->getUser();
+		// 	return [
+		// 		'id' => $this->appId,
+		// 		'name' => $server->getL10N($this->appId)->t($this->appNamespace),
+		// 		'href' => $server->getURLGenerator()->linkToRouteAbsolute($this->appId . '.Page.index'),
+		// 		'icon' => $server->getURLGenerator()->imagePath($this->appId, 'app.svg'),
+		// 		'order' => 3,
+		// 		'type' => 'link',
+		// 	];
+		// });
 
 		/** @var IEventDispatcher $dispatcher */
 		$dispatcher = $server->get(IEventDispatcher::class);
