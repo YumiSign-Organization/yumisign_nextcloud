@@ -21,11 +21,16 @@
  *
  */
 
-namespace OCA\RCDevs\Controller;
+declare(strict_types=1);
 
-use OCA\RCDevs\Service\ConfigurationService;
-use OCA\RCDevs\Utility\Constantes\CstConfig;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
+namespace OCA\YumiSignNxtC\RCDevs\Controller;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstConfig;
+use OCA\YumiSignNxtC\RCDevs\Dto\CDEM;
+use OCA\YumiSignNxtC\RCDevs\Service\ConfigurationService;
+
+// Nextcloud Core
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
@@ -33,20 +38,22 @@ use OCP\IRequest;
 class UiController extends Controller
 {
 	public function __construct(
-		IRequest							$request,
-		private ConfigurationService		$configurationService,
-		string								$AppName,
+		IRequest $request,
+		private ConfigurationService $configurationService,
+		string $AppName
 	) {
 		parent::__construct($AppName, $request);
 	}
 
 	public function getItemsPerPage(): JSONResponse
 	{
-		return new JSONResponse([
-			CstRequest::CODE		=> 1,
-			CstConfig::ITEMSPERPAGE	=> $this->configurationService->getUiItemsPerPage(),
-			CstRequest::MESSAGE		=> null,
-			CstRequest::STATUS		=> true,
-		]);
+		$cdem = new CDEM();
+		$cdem->setOk(
+			data: [
+				CstConfig::ITEMSPERPAGE => $this->configurationService->getUiItemsPerPage(),
+			],
+		);
+
+		return new JSONResponse($cdem->toArray());
 	}
 }

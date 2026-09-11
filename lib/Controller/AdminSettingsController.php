@@ -21,24 +21,31 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\RCDevs\Controller\AdminSettingsController as RCDevsSettingsController;
-use OCA\RCDevs\Utility\Helpers;
-use OCA\RCDevs\Utility\LogRCDevs;
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Controller\AdminSettingsController as RCDevsSettingsController;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\Helpers;
+use OCA\YumiSignNxtC\Constant\CstCommon;
+use OCA\YumiSignNxtC\Constant\CstConfig;
+use OCA\YumiSignNxtC\Constant\CstEntity;
+use OCA\YumiSignNxtC\Constant\CstRequest;
+use OCA\YumiSignNxtC\Constant\CstReturn;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
 use OCA\YumiSignNxtC\Service\SettingsService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
-use OCA\YumiSignNxtC\Utility\Constantes\CstConfig;
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
-use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
+
+// Nextcloud Core
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Services\IInitialState;
-use OCP\IConfig;
+use OCP\IAppConfig;
 use OCP\IRequest;
 use OCP\Settings\ISettings;
+use OCP\IUserManager;
 use OCP\Util;
 
 class AdminSettingsController extends Controller implements ISettings
@@ -48,16 +55,17 @@ class AdminSettingsController extends Controller implements ISettings
 	private	string						$serverUrl;
 	private	string						$workspaceId;
 	private	string						$workspaceName;
-	private IConfig						$config;
+	private IAppConfig					$config;
 
 	public function __construct(
-		IConfig							$config,
-		IRequest						$request,
-		private	SettingsService			$settingsService,
-		private IInitialState			$initialState,
-		private LogRCDevs				$logRCDevs,
-		string							$AppName,
-
+		IAppConfig $config,
+		IRequest $request,
+		private SettingsService $settingsService,
+		private IInitialState $initialState,
+		private LogRCDevs $logRCDevs,
+		private IUserManager $userManager,
+		private string $userId,
+		string $AppName
 	) {
 		parent::__construct($AppName, $request);
 
@@ -75,16 +83,16 @@ class AdminSettingsController extends Controller implements ISettings
 		);
 
 		$this->serverUrl		= $this->configurationService->getUrlApp() ?? '';
-		$this->workspaceId		= $request->getParam('workspace_id')	?? ($this->configurationService->getWorkspaceId()	?? '');
+		$this->workspaceId		= (string) ($request->getParam('workspace_id') ?? $this->configurationService->getWorkspaceId());
 		$this->workspaceName	= $request->getParam('workspace_name')	?? ($this->configurationService->getWorkspaceName()	?? '');
 	}
 
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
-	private function convertForVueJsSwitch($settingToConvert): bool
-	{
+	private function convertForVueJsSwitch(
+		$settingToConvert
+	): bool {
 		switch (true) {
 			case empty($settingToConvert):
 				return false;
@@ -107,7 +115,6 @@ class AdminSettingsController extends Controller implements ISettings
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
-
 	public function checkCronStatus(): JSONResponse
 	{
 		return $this->rcdevsSettingsController->checkCronStatus();
@@ -118,7 +125,10 @@ class AdminSettingsController extends Controller implements ISettings
 	 */
 	public function checkEnabledSign(): JSONResponse
 	{
-		return $this->rcdevsSettingsController->checkEnabledSign();
+		$response = $this->rcdevsSettingsController->checkEnabledSign()->getData();
+		$response['debugVueJs'] = $this->configurationService->getDebugVueJs();
+
+		return new JSONResponse($response);
 	}
 
 	/**
@@ -128,14 +138,16 @@ class AdminSettingsController extends Controller implements ISettings
 	{
 		// Get the YumiSign server url status (OK/KO) for the Settings page
 		$resp = $this->rcdevsSettingsController->checkServerUrl("{$this->serverUrl}/workspaces/{$this->workspaceId}");
+		$data = Helpers::getArrayData($resp, CstReturn::DATA, false);
+		$status = Helpers::getArrayData(is_array($data) ? $data : null, CstRequest::STATUS, false);
 
-		$resp[CstRequest::ID] = (Helpers::isValidResponse($resp) ? $this->workspaceId : 0);
+		$resp[CstRequest::ID] = (Helpers::isValidHttpResponse($resp) ? $this->workspaceId : 0);
 
 		return new JSONResponse([
-			CstRequest::CODE	=> $resp[CstRequest::CODE],
+			CstReturn::CODE	=> $resp[CstReturn::CODE],
 			CstRequest::ID		=> $resp[CstRequest::ID],
-			CstRequest::MESSAGE	=> $resp[CstRequest::MESSAGE],
-			CstRequest::STATUS	=> $resp[CstRequest::STATUS],
+			CstReturn::MESSAGE	=> $resp[CstReturn::MESSAGE],
+			CstRequest::STATUS	=> $status,
 		]);
 	}
 
@@ -145,6 +157,39 @@ class AdminSettingsController extends Controller implements ISettings
 	public function checkSignTypes(): JSONResponse
 	{
 		return $this->rcdevsSettingsController->checkSignTypes();
+	}
+
+	/**
+	 * @NoAdminRequired
+	 */
+	public function checkModalBootstrap(): JSONResponse
+	{
+		$serverCheck = $this->checkServerUrl()->getData();
+		$signTypes = $this->checkSignTypes()->getData();
+		$appCheck = $this->checkEnabledSign()->getData();
+
+		$currentUserEmail = '';
+		try {
+			$currentUser = $this->userManager->get($this->userId);
+			if ($currentUser !== null) {
+				$currentUserEmail = $currentUser->getEMailAddress() ?? '';
+			}
+		} catch (\Throwable $th) {
+			$currentUserEmail = '';
+		}
+
+		return new JSONResponse([
+			CstReturn::CODE => 0,
+			CstReturn::DATA => [
+				'settingsCheck' => $serverCheck,
+				'settingsCheckApp' => $appCheck,
+				'settingsCheckTypes' => $signTypes,
+				'userEmail' => $currentUserEmail,
+				'userId' => $this->userId,
+			],
+			CstReturn::ERROR => null,
+			CstReturn::MESSAGE => null,
+		]);
 	}
 
 	private function checkWorkspace(): JSONResponse
@@ -173,28 +218,29 @@ class AdminSettingsController extends Controller implements ISettings
 	public function getForm(): TemplateResponse
 	{
 		$initialSettings = [
-			'apiKey'				=> $this->config->getAppValue($this->configurationService->getAppId(), 'api_key'),
-			'asyncTimeout'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'async_timeout', 1),
-			'clientId'				=> $this->config->getAppValue($this->configurationService->getAppId(), 'client_id'),
-			'clientSecret'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'client_secret'),
-			'cronInterval'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'cron_interval', 5),
-			'description'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'description'),
-			'enableSign'			=> $this->convertForVueJsSwitch($this->config->getAppValue($this->configurationService->getAppId(), 'enable_sign')),
-			'installedVersion'		=> $this->config->getAppValue($this->configurationService->getAppId(), 'installed_version'),
-			'overwrite'				=> $this->convertForVueJsSwitch($this->config->getAppValue($this->configurationService->getAppId(), 'overwrite')),
-			'proxyHost'				=> $this->config->getAppValue($this->configurationService->getAppId(), 'proxy_host'),
-			'proxyPassword'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'proxy_password'),
-			'proxyPort'				=> $this->config->getAppValue($this->configurationService->getAppId(), 'proxy_port'),
-			'proxyUsername'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'proxy_username'),
-			'signTypeAdvanced'		=> $this->convertForVueJsSwitch($this->config->getAppValue($this->configurationService->getAppId(), 'sign_type_advanced')),
-			'signTypeQualified'		=> $this->convertForVueJsSwitch($this->config->getAppValue($this->configurationService->getAppId(), 'sign_type_qualified')),
-			'signTypeStandard'		=> $this->convertForVueJsSwitch($this->config->getAppValue($this->configurationService->getAppId(), 'sign_type_standard')),
-			'textualComplementSign'	=> $this->config->getAppValue($this->configurationService->getAppId(), 'textual_complement_sign'),
-			'useProxy'				=> $this->convertForVueJsSwitch($this->config->getAppValue($this->configurationService->getAppId(), 'use_proxy')),
-			'workspaceId'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'workspace_id'),
-			'workspaceName'			=> $this->config->getAppValue($this->configurationService->getAppId(), 'workspace_name'),
+			'apiKey'				=> $this->config->getValueString($this->configurationService->getAppId(), 'api_key'),
+			'asyncTimeout'			=> $this->config->getValueInt($this->configurationService->getAppId(), 'async_timeout', default: 1),
+			'clientId'				=> $this->config->getValueString($this->configurationService->getAppId(), 'client_id'),
+			'clientSecret'			=> $this->config->getValueString($this->configurationService->getAppId(), 'client_secret'),
+			'cronInterval'			=> $this->config->getValueInt($this->configurationService->getAppId(), 'cron_interval', default: 5),
+			'description'			=> $this->config->getValueString($this->configurationService->getAppId(), 'description'),
+			'enableSign'			=> $this->convertForVueJsSwitch($this->config->getValueInt($this->configurationService->getAppId(), 'enable_sign')),
+			'installedVersion'		=> $this->config->getValueString($this->configurationService->getAppId(), 'installed_version'),
+			'overwrite'				=> $this->convertForVueJsSwitch($this->config->getValueInt($this->configurationService->getAppId(), 'overwrite')),
+			'proxyHost'				=> $this->config->getValueString($this->configurationService->getAppId(), 'proxy_host'),
+			'proxyPassword'			=> $this->config->getValueString($this->configurationService->getAppId(), 'proxy_password'),
+			'proxyPort'				=> $this->config->getValueString($this->configurationService->getAppId(), 'proxy_port'),
+			'proxyUsername'			=> $this->config->getValueString($this->configurationService->getAppId(), 'proxy_username'),
+			'sign_type_advanced'		=> $this->convertForVueJsSwitch($this->config->getValueInt($this->configurationService->getAppId(), 'sign_type_advanced')),
+			'sign_type_qualified'		=> $this->convertForVueJsSwitch($this->config->getValueInt($this->configurationService->getAppId(), 'sign_type_qualified')),
+			'sign_type_standard'		=> $this->convertForVueJsSwitch($this->config->getValueInt($this->configurationService->getAppId(), 'sign_type_standard')),
+			'textualComplementSign'	=> $this->config->getValueString($this->configurationService->getAppId(), 'textual_complement_sign'),
+			'useProxy'				=> $this->convertForVueJsSwitch($this->config->getValueInt($this->configurationService->getAppId(), 'use_proxy')),
+			'workspaceId'			=> $this->config->getValueString($this->configurationService->getAppId(), 'workspace_id'),
+			'workspaceName'			=> $this->config->getValueString($this->configurationService->getAppId(), 'workspace_name'),
 		];
 
+		$this->initialState->provideInitialState('debugVueJs', $this->configurationService->getDebugVueJs());
 		$this->initialState->provideInitialState('initialSettings', $initialSettings);
 		$this->logRCDevs->debug(sprintf('Initial Admin Settings provided : [%s]', json_encode($initialSettings)));
 
@@ -234,12 +280,12 @@ class AdminSettingsController extends Controller implements ISettings
 		$this->rcdevsSettingsController->saveSettings();
 
 		// Specific App data
-		$this->config->setAppValue($this->configurationService->getAppId(), CstConfig::DESCRIPTION,	$this->request->getParam(CstConfig::DESCRIPTION));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::WORKSPACE_ID,	$this->request->getParam(CstEntity::WORKSPACE_ID));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::WORKSPACE_NAME,	$this->request->getParam(CstEntity::WORKSPACE_NAME));
+		$this->config->setValueString($this->configurationService->getAppId(), CstConfig::DESCRIPTION,	$this->request->getParam(CstConfig::DESCRIPTION));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::WORKSPACE_ID,	$this->workspaceId);
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::WORKSPACE_NAME,	$this->request->getParam(CstEntity::WORKSPACE_NAME));
 
 		return new JSONResponse([
-			'code' => 1,
+			'code' => 0,
 		]);
 	}
 }

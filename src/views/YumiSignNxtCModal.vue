@@ -41,9 +41,9 @@
 					</rcdevsRow>
 				</rcdevsModalHeader>
 
-				<rcdevsSettingsKO v-if="actionSign && disabledSign && enabledApp.checked" class="alert alertDanger disabledAction">
-					{{ ui.messages.warning.disabled.sign }}
-				</rcdevsSettingsKO>
+					<rcdevsSettingsKO v-if="actionSign && disabledSign && enabledApp.checked" class="alert alertDanger disabledAction">
+						{{ getDisabledSignMessage() }}
+					</rcdevsSettingsKO>
 
 				<rcdevsWaitingOcs v-if="!rcdevsSettings.checked || !enabledApp.checked || !signTypes.checked">
 					<img :src="ui.pictures.loadingImg" />
@@ -65,7 +65,7 @@
 								{{ ui.messages.filenameMessage.nextcloudUser }}
 							</NcCheckboxRadioSwitch>
 							<SelectNextcloudUsers>
-								<NcSelect id="rcdevsUsersFiltered" v-bind="usersListProps" v-model="usersListProps.value" @search="search" :no-wrap="true" />
+								<NcSelect id="rcdevsUsersFiltered" v-bind="usersListProps" v-model="usersListProps.value" @search="search" :filter-by="filterUsersListOption" :no-wrap="true" />
 								<!-- <SearchResults id="rcdevsSearchResultsYMS" v-if="user !== ''" :search-text="user" :search-results="userResults" :entries-loading="usersLoading" :no-results="noUserResults" :scrollable="true" :selectable="true" @click="addUser" /> -->
 							</SelectNextcloudUsers>
 						</recipientsSignleChoice>
@@ -172,7 +172,7 @@ import {appName, modalName, signAction, signatureLabel, signatureLabelFull, uiTi
 import {emit} from '@nextcloud/event-bus';
 import {File, Permission} from '@nextcloud/files';
 import {generateFilePath, generateRemoteUrl, generateUrl} from '@nextcloud/router';
-import {getBasename, getOcsUrl, getT, isEmail, isEnabled, isIssueResponse, isValidResponse, log} from '../javascript/utility';
+import {CDEM, getBasename, getFunctionName as getUtilityFunctionName, getOcsUrl, getT, isEmail, isEnabled, log, setDebugVueJs} from '../javascript/utility';
 import {getCurrentUser} from '@nextcloud/auth';
 import axios from '@nextcloud/axios';
 import debounce from 'debounce';
@@ -196,12 +196,8 @@ export default {
 
 	data() {
 		this.apis = [];
-		this.apis.settingsCheck = '/settings/check';
-		this.apis.settingsCheckTypes = '/settings/check/types';
-		this.apis.settingsCheckApp = '/settings/check/app';
+		this.apis.modalBootstrap = '/settings/check/modal/bootstrap';
 		this.apis.signLocalAsync = '/sign/local/async';
-		this.apis.userEmail = '/user/email';
-		this.apis.userId = '/user/id';
 		this.apis.usersAll = '/users/all';
 
 		this.constantes = [];
@@ -247,9 +243,11 @@ export default {
 		this.ui.messages.filenameMessage.searchUsers = getT('Search users');
 		this.ui.messages.filenameMessage.sign = getT(signatureLabelFull);
 		this.ui.messages.placeHolderEmailsList = getT('Emails separated by commas');
-		this.ui.messages.warning = [];
-		this.ui.messages.warning.disabled = [];
-		this.ui.messages.warning.disabled.sign = getT('All signature modes are disabled; you have to enable minimum one mode in this application settings prior to sign any document');
+			this.ui.messages.warning = [];
+			this.ui.messages.warning.disabled = [];
+			this.ui.messages.warning.disabled.settings = getT('Application settings are not validated; check the server URL and credentials.');
+			this.ui.messages.warning.disabled.app = getT('Signature is disabled in application settings.');
+			this.ui.messages.warning.disabled.sign = getT('All signature modes are disabled; you have to enable minimum one mode in this application settings prior to sign any document');
 
 		this.ui.pictures = [];
 		this.ui.pictures.mobileSigningImg = generateFilePath(appName, '', 'img/') + 'mobileSigning.png';
@@ -342,6 +340,10 @@ export default {
 			designerUrl: '',
 
 			signatureTypeSelected: 'simple', // Setting initial value
+			modalBootstrap: {
+				inProgress: false,
+				done: false,
+			},
 			usersListProps: {
 				inputLabel: '',
 				userSelect: true,
@@ -405,181 +407,190 @@ export default {
 			}
 		},
 
-		axiosSettingsCheck: function () {
+		axiosModalBootstrap: function () {
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
+				this.modalBootstrap.inProgress = true;
+				this.modalBootstrap.done = false;
 				this.axiosChecking = this.initAxios();
-
-				log.info(`Contact server to check settings (Global)`);
+				this.axiosUser = this.initAxios();
+				log.info(`[${this.getFunctionName()}] Contact server to bootstrap modal settings`);
 
 				axios
-					.get(getOcsUrl(this.apis.settingsCheck), {
+					.get(getOcsUrl(this.apis.modalBootstrap), {
 						signal: this.axiosChecking.abortCtrl.signal,
 					})
 					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						log.debug(`[${this.getFunctionName()}] Response for ${JSON.stringify(response.data)}`);
+						const cdem = CDEM(response.data);
+						const isCdemLike = (payload) => {
+							return (
+								payload &&
+								typeof payload === 'object' &&
+								Object.prototype.hasOwnProperty.call(payload, 'code') &&
+								Object.prototype.hasOwnProperty.call(payload, 'data') &&
+								Object.prototype.hasOwnProperty.call(payload, 'error') &&
+								Object.prototype.hasOwnProperty.call(payload, 'message')
+							);
+						};
+						const unwrapData = (payload) => {
+							return isCdemLike(payload) ? payload.data : payload;
+						};
+						const normalizeEnabled = (value) => {
+							if (typeof value === 'string') {
+								const normalizedValue = value.trim().toLowerCase();
+								if (normalizedValue === '1' || normalizedValue === 'true') {
+									return true;
+								}
+								if (normalizedValue === '0' || normalizedValue === 'false' || normalizedValue === '') {
+									return false;
+								}
+							}
+							return isEnabled(value);
+						};
+						const bootstrapData = unwrapData(cdem);
 
-						if (isIssueResponse(response)) {
-							throw new Error(`No property named "code" in Axios response`);
+						if (!bootstrapData || typeof bootstrapData !== 'object') {
+							throw new Error('Modal bootstrap data is missing');
 						}
 
-						// log.debug(`isEnabled(response.data.code):[${isEnabled(response.data.code)}]`);
-						log.debug(`isValidResponse(response):[${isValidResponse(response)}]`);
-
-						this.axiosChecking.success = true;
-						// this.rcdevsSettings.validated = isEnabled(response.data.code);
-						this.rcdevsSettings.validated = isValidResponse(response);
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosChecking.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosChecking.message = exception.message;
+						if (!Object.prototype.hasOwnProperty.call(bootstrapData, 'settingsCheck')) {
+							throw new Error('Modal bootstrap settingsCheck is missing');
+						}
+						if (!Object.prototype.hasOwnProperty.call(bootstrapData, 'settingsCheckApp')) {
+							throw new Error('Modal bootstrap settingsCheckApp is missing');
+						}
+						if (!Object.prototype.hasOwnProperty.call(bootstrapData, 'settingsCheckTypes')) {
+							throw new Error('Modal bootstrap settingsCheckTypes is missing');
 						}
 
-						this.axiosChecking.error = !(this.rcdevsSettings.validated = false);
-					})
-					.finally(() => {
-						this.axiosChecking.inProgress = false;
+						const settingsCheckRaw = bootstrapData.settingsCheck;
+						const settingsCheckAppRaw = bootstrapData.settingsCheckApp;
+						const settingsCheckTypesRaw = bootstrapData.settingsCheckTypes;
+						const settingsCheckApp = unwrapData(settingsCheckAppRaw) || {};
+						const settingsCheckTypes = unwrapData(settingsCheckTypesRaw) || {};
+						const settingsCheckTypesData = settingsCheckTypes && typeof settingsCheckTypes === 'object' && Object.prototype.hasOwnProperty.call(settingsCheckTypes, 'data') && typeof settingsCheckTypes.data === 'object'
+							? settingsCheckTypes.data
+							: settingsCheckTypes;
+						const currentUserId = bootstrapData.userId ?? null;
+						const currentUserEmail = bootstrapData.userEmail ?? null;
+
+						// RCDevs settings check
+						let settingsCheckCode = -1;
+						if (isCdemLike(settingsCheckRaw)) {
+							settingsCheckCode = parseInt(settingsCheckRaw.code ?? -1);
+						} else if (settingsCheckRaw && typeof settingsCheckRaw === 'object' && Object.prototype.hasOwnProperty.call(settingsCheckRaw, 'code')) {
+							settingsCheckCode = parseInt(settingsCheckRaw.code ?? -1);
+						}
+						this.rcdevsSettings.validated = settingsCheckCode === 0;
 						this.rcdevsSettings.checked = true;
-						this.refreshUiVariables();
-					});
-			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
-			}
-		},
 
-		axiosSettingsCheckApp: function () {
-			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosChecking = this.initAxios();
-
-				log.info(`Contact server to check settings`);
-
-				axios
-					.get(getOcsUrl(this.apis.settingsCheckApp), {
-						signal: this.axiosChecking.abortCtrl.signal,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						// Check results Sign
-						if (!response.data.hasOwnProperty('enableSign')) {
-							throw new Error('Internal server error: this application cannot be enabled due to lack of information');
+						// App settings check
+						let enableSignValue = null;
+						if (Object.prototype.hasOwnProperty.call(settingsCheckApp, 'enableSign')) {
+							enableSignValue = settingsCheckApp.enableSign;
+						} else if (settingsCheckAppRaw && typeof settingsCheckAppRaw === 'object' && Object.prototype.hasOwnProperty.call(settingsCheckAppRaw, 'enableSign')) {
+							enableSignValue = settingsCheckAppRaw.enableSign;
 						}
-						this.axiosChecking.success = true;
-						this.enabledApp.sign = isEnabled(response.data.enableSign) && this.isActionSign();
-						log.debug(`
-this.enabledApp.sign:[${this.enabledApp.sign}] /
-response.data.enableSign:[${response.data.enableSign}] /
-isEnabled(response.data.enableSign):[${isEnabled(response.data.enableSign)}] /
-this.isActionSign():[${this.isActionSign()}] /
-`);
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosChecking.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosChecking.message = exception.message;
+						if (enableSignValue === null) {
+							throw new Error('Modal bootstrap enableSign is missing');
 						}
-
-						this.axiosChecking.error = !(this.enabledApp.sign = false);
-					})
-					.finally(() => {
-						this.axiosChecking.inProgress = false;
+						if (Object.prototype.hasOwnProperty.call(settingsCheckApp, 'debugVueJs')) {
+							setDebugVueJs(settingsCheckApp.debugVueJs === true);
+						}
+						this.enabledApp.sign = normalizeEnabled(enableSignValue) && this.isActionSign();
 						this.enabledApp.checked = true;
-						this.refreshUiVariables();
-					});
-			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
-			}
-		},
 
-		axiosSettingsCheckTypes: function () {
-			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosChecking = this.initAxios();
-
-				log.info(`Contact server to check settings (Signature types)`);
-
-				axios
-					.get(getOcsUrl(this.apis.settingsCheckTypes), {
-						signal: this.axiosChecking.abortCtrl.signal,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						// Check results Advanced
-						if (!response.data.hasOwnProperty('signTypeAdvanced')) {
+						// Signature types check
+						if (!Object.prototype.hasOwnProperty.call(settingsCheckTypesData, 'sign_type_advanced')) {
 							throw new Error('Sign type advanced is missing');
 						}
-
-						// Check results Qualified
-						if (!response.data.hasOwnProperty('signTypeQualified')) {
+						if (!Object.prototype.hasOwnProperty.call(settingsCheckTypesData, 'sign_type_qualified')) {
 							throw new Error('Sign type qualified is missing');
 						}
-
-						// Check results Standard
-						if (!response.data.hasOwnProperty('signTypeStandard')) {
+						if (!Object.prototype.hasOwnProperty.call(settingsCheckTypesData, 'sign_type_standard')) {
 							throw new Error('Sign type standard is missing');
 						}
 
-						this.axiosChecking.success = true;
+						let responseDataSigntypeadvanced = settingsCheckTypesData.sign_type_advanced;
+						let responseDataSigntypequalified = settingsCheckTypesData.sign_type_qualified;
+						let responseDataSigntypestandard = settingsCheckTypesData.sign_type_standard;
 
-						// Use temporary vars (issue on response which cannot be changed !?!)
-						let responseDataSigntypeadvanced = response.data.signTypeAdvanced;
-						let responseDataSigntypequalified = response.data.signTypeQualified;
-						let responseDataSigntypestandard = response.data.signTypeStandard;
-
-						// According to file to sign extension, disable the standard signature (if not a PDF)
-						if (!this.chosenFile.path.toLowerCase().endsWith('.pdf')) {
+						const chosenFilePath = (this.chosenFile?.path ?? '').toLowerCase();
+						if (!chosenFilePath.endsWith('.pdf')) {
 							responseDataSigntypestandard = '0';
 						}
 
-						log.info(`The signTypes are standard : [${responseDataSigntypestandard}], advanced : [${responseDataSigntypeadvanced}] and qualified : [${responseDataSigntypeadvanced}]`);
-
-						this.signTypes.advanced.enabled = isEnabled(responseDataSigntypeadvanced);
-						this.signTypes.qualified.enabled = isEnabled(responseDataSigntypequalified);
-						this.signTypes.standard.enabled = isEnabled(responseDataSigntypestandard);
+						this.signTypes.advanced.enabled = normalizeEnabled(responseDataSigntypeadvanced);
+						this.signTypes.qualified.enabled = normalizeEnabled(responseDataSigntypequalified);
+						this.signTypes.standard.enabled = normalizeEnabled(responseDataSigntypestandard);
 
 						let cptEnabled = 0;
 						cptEnabled += +this.signTypes.advanced.enabled;
 						cptEnabled += +this.signTypes.qualified.enabled;
 						cptEnabled += +this.signTypes.standard.enabled;
-						log.debug(`this.signTypes.advanced.enabled:[${this.signTypes.advanced.enabled}] / this.signTypes.qualified.enabled:[${this.signTypes.qualified.enabled}] / this.signTypes.standard.enabled:[${this.signTypes.standard.enabled}] / cptEnabled:[${cptEnabled}]`);
 
 						switch (cptEnabled) {
 							case 0:
-								throw new Error('Minimum one signature type is needed to sign the document');
+								log.warn(`[${this.getFunctionName()}] Minimum one signature type is needed to sign the document`);
+								this.signTypes.advanced.label = this.constantes.signType.advanced.label;
+								this.signTypes.qualified.label = this.constantes.signType.qualified.label;
+								this.signTypes.standard.label = this.constantes.signType.standard.label;
 								break;
 							case 1:
 								this.signTypes.advanced.label = this.signTypes.qualified.label = this.signTypes.standard.label = getT('Signature');
 								break;
-
 							default:
 								this.signTypes.advanced.label = this.constantes.signType.advanced.label;
 								this.signTypes.qualified.label = this.constantes.signType.qualified.label;
 								this.signTypes.standard.label = this.constantes.signType.standard.label;
 								break;
 						}
+
+						this.signTypes.checked = true;
+
+						// Current user
+						this.currentUser.id = currentUserId;
+						this.currentUser.email = currentUserEmail;
+						this.getCurrentUser();
+
+						this.axiosChecking.success = true;
+						this.axiosUser.success = true;
 					})
 					.catch((exception) => {
+						log.error(`[${this.getFunctionName()}] exception:[${exception}]`);
 						if (axios.isCancel(exception)) {
 							this.axiosChecking.message = this.ui.axios.requestCancelled;
+							this.axiosUser.message = this.ui.axios.requestCancelled;
 						} else {
 							this.axiosChecking.message = exception.message;
+							this.axiosUser.message = exception.message;
 						}
 
-						this.axiosChecking.error = !(this.signTypes.advanced.enabled = this.signTypes.qualified.enabled = this.signTypes.standard.enabled = false);
+						this.axiosChecking.error = true;
+						this.axiosUser.error = true;
+
+						this.rcdevsSettings.validated = false;
+						this.rcdevsSettings.checked = true;
+						this.enabledApp.sign = false;
+						this.enabledApp.checked = true;
+						this.signTypes.advanced.enabled = false;
+						this.signTypes.qualified.enabled = false;
+						this.signTypes.standard.enabled = false;
+						this.signTypes.checked = true;
+						this.currentUser.id = null;
+						this.currentUser.email = null;
 					})
 					.finally(() => {
 						this.axiosChecking.inProgress = false;
-						this.signTypes.checked = true;
+						this.axiosUser.inProgress = false;
+						this.modalBootstrap.inProgress = false;
+						this.modalBootstrap.done = true;
 						this.refreshUiVariables();
-						log.debug(`this.signTypes.advanced.enabled:[${this.signTypes.advanced.enabled}] / this.signTypes.qualified.enabled:[${this.signTypes.qualified.enabled}] / this.signTypes.standard.enabled:[${this.signTypes.standard.enabled}]`);
-						log.debug(`this.enabledSign:[${this.enabledSign}]`);
 					});
 			} catch (exception) {
+				this.modalBootstrap.inProgress = false;
+				this.modalBootstrap.done = true;
 				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
 		},
@@ -589,15 +600,15 @@ this.isActionSign():[${this.isActionSign()}] /
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				this.axiosSrvRequest = this.initAxios();
 
-				log.info(`chosenFile : ${JSON.stringify(this.chosenFile)}`);
-				log.info(`fileId : ${this.chosenFile._attributes.fileid}`);
+				log.info(`[${this.getFunctionName()}] chosenFile : ${JSON.stringify(this.chosenFile)}`);
+				log.info(`[${this.getFunctionName()}] fileId : ${this.chosenFile.fileid}`);
 
-				axios
+				return axios
 					.post(
 						getOcsUrl(apiUrlSignature),
 						{
 							path: this.chosenFile.path,
-							fileId: this.chosenFile._attributes.fileid,
+							fileId: this.chosenFile.fileid,
 							recipientId: recipientId,
 							recipientEmail: recipientEmail,
 							recipientType: recipientType,
@@ -608,21 +619,31 @@ this.isActionSign():[${this.isActionSign()}] /
 					)
 					.then((response) => {
 						log.debug(`Asynchronized signature response : [${JSON.stringify(response.data)}]`);
+						const cdem = CDEM(response.data);
 
-						if (isIssueResponse(response)) {
-							throw new Error(getT('Error: ') + getT(response.data.message));
+						if (cdem.code !== 0) {
+							throw new Error(getT('Error: ') + getT(cdem.message));
 						}
 						this.axiosSrvRequest.error = !(this.file.signed = this.axiosSrvRequest.success = true);
-						this.axiosSrvRequest.message = response.data.message;
+						this.axiosSrvRequest.message = cdem.message;
 
-						const yumisignCallback = `${location.protocol}//${location.host}` + generateUrl(`/apps/${appName}/sign/mobile/async/external/submit`) + '?' + `&workspaceId=${response.data.workspaceId}` + `&workflowId=${response.data.workflowId}` + `&envelopeId=${response.data.envelopeId}` + `&url=${window.location.href}`;
+							const payload = cdem.data && typeof cdem.data === 'object' ? cdem.data : response.data;
+							const yumisignCallback = `${location.protocol}//${location.host}${generateUrl(`/apps/${appName}/sign/mobile/async/external/submit`)}?${new URLSearchParams({
+								workspaceId: String(payload.workspaceId ?? ''),
+								workflowId: String(payload.workflowId ?? ''),
+								envelopeId: String(payload.envelopeId ?? ''),
+								url: window.location.href,
+							}).toString()}`;
 
-						if (response.data.designerUrl) {
-							this.designerUrl = response.data.designerUrl + '?callback=' + encodeURIComponent(yumisignCallback);
-							if (this.signatureTypeSelected.toLowerCase() !== this.constantes.signType.qualified.value) {
-								window.location.replace(this.designerUrl);
+							if (payload.designerUrl) {
+								let designerUrl = String(payload.designerUrl);
+								const designerUrlObj = new URL(designerUrl, window.location.origin);
+								designerUrlObj.searchParams.set('callback', yumisignCallback);
+								this.designerUrl = designerUrlObj.toString();
+								if (this.signatureTypeSelected.toLowerCase() !== this.constantes.signType.qualified.value) {
+									window.location.replace(this.designerUrl);
+								}
 							}
-						}
 					})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
@@ -642,86 +663,12 @@ this.isActionSign():[${this.isActionSign()}] /
 			}
 		},
 
-		axiosUserEmail: function () {
-			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosUser = this.initAxios();
-
-				log.info(`Contact server to retrieve User's email`);
-
-				axios
-					.get(getOcsUrl(this.apis.userEmail), {
-						signal: this.axiosUser.abortCtrl.signal,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						this.currentUser.email = response.data;
-						this.getCurrentUser();
-
-						this.axiosUser.success = true;
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosUser.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosUser.message = exception.message;
-						}
-
-						this.axiosUser.error = true;
-						this.currentUser.email = null;
-					})
-					.finally(() => {
-						this.axiosUser.inProgress = false;
-					});
-			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
-			}
-		},
-
-		axiosUserId: function () {
-			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosUser = this.initAxios();
-
-				log.info(`Contact server to retrieve User's id`);
-
-				axios
-					.get(getOcsUrl(this.apis.userId), {
-						signal: this.axiosUser.abortCtrl.signal,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						this.currentUser.id = response.data;
-						this.getCurrentUser();
-
-						this.axiosUser.success = true;
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosUser.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosUser.message = exception.message;
-						}
-
-						this.axiosUser.error = true;
-						this.currentUser.id = null;
-					})
-					.finally(() => {
-						this.axiosUser.inProgress = false;
-					});
-			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
-			}
-		},
-
 		axiosUsersList: function (query) {
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				this.axiosUser = this.initAxios();
 
-				log.info(`Contact server to retrieve Users list`);
+				log.info(`[${this.getFunctionName()}] Contact server to retrieve Users list`);
 
 				return axios
 					.post(
@@ -735,7 +682,7 @@ this.isActionSign():[${this.isActionSign()}] /
 						}
 					)
 					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						log.debug(`[${this.getFunctionName()}] Response for ${JSON.stringify(response.data)}`);
 						this.axiosUser.success = true;
 
 						const respData = response.data;
@@ -808,7 +755,7 @@ this.isActionSign():[${this.isActionSign()}] /
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				if (this.axiosSrvRequest.abortCtrl && this.axiosSrvRequest.abortCtrl.signal) {
 					this.axiosSrvRequest.abortCtrl.abort('Operation canceled by the user');
-					log.info('Operation canceled by the user');
+					log.info(`[${this.getFunctionName()}] Operation canceled by the user`);
 				}
 
 				this.resetInputs();
@@ -817,7 +764,6 @@ this.isActionSign():[${this.isActionSign()}] /
 				// Reset inputs
 				this.usersListProps.options = [];
 				this.emailsList = '';
-
 			} catch (exception) {
 				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
@@ -850,28 +796,25 @@ this.isActionSign():[${this.isActionSign()}] /
 
 			this.axiosSrvRequest.error = !(this.file.signed = this.axiosSrvRequest.success = true);
 		},
-		
+
 		commonWatch: function (newValue) {
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
-				if (newValue) {
-					this.modal = true;
-
-					this.resetInputs();
-
-					// Verify App settings
-					this.axiosSettingsCheck();
-
-					// Check Signature Types
-					this.axiosSettingsCheckTypes();
-					this.axiosSettingsCheckApp();
-
-					// Get current user Id
-					this.axiosUserId();
-					this.axiosUserEmail();
-				} else {
+				if (!this.action || !this.chosenFile) {
 					this.modal = false;
+					return;
 				}
+
+				if (this.modalBootstrap.inProgress || this.modalBootstrap.done) {
+					return;
+				}
+
+				this.modal = true;
+
+				this.resetInputs();
+
+				// Verify App settings, sign types and current user with one request
+				this.axiosModalBootstrap();
 			} catch (exception) {
 				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
@@ -882,7 +825,7 @@ this.isActionSign():[${this.isActionSign()}] /
 		}, 250),
 
 		findUsersFiltered: function () {
-			log.info(this.usersListProps.value);
+			log.info(`[${this.getFunctionName()}] ${this.usersListProps.value}`);
 		},
 
 		getCurrentUser: function () {
@@ -904,7 +847,7 @@ this.isActionSign():[${this.isActionSign()}] /
 			}
 		},
 
-		getFilenameMessage: function () {
+			getFilenameMessage: function () {
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				let localReturn = this.isActionSign() ? this.ui.messages.filenameMessage.sign : '';
@@ -914,15 +857,35 @@ this.isActionSign():[${this.isActionSign()}] /
 			} catch (exception) {
 				log.error(`[${this.getFunctionName()}] ${exception}`);
 			}
-		},
+			},
+
+			getDisabledSignMessage: function () {
+				try {
+					if (!this.rcdevsSettings.checked || !this.enabledApp.checked || !this.signTypes.checked) {
+						return '';
+					}
+
+					if (this.settingKO) {
+						return this.ui.messages.warning.disabled.settings;
+					}
+
+					if (!this.enabledApp.sign) {
+						return this.ui.messages.warning.disabled.app;
+					}
+
+					if (!this.signTypes.advanced.enabled && !this.signTypes.qualified.enabled && !this.signTypes.standard.enabled) {
+						return this.ui.messages.warning.disabled.sign;
+					}
+
+					return '';
+				} catch (exception) {
+					log.error(`[${this.getFunctionName()}] ${exception}`);
+					return this.ui.messages.warning.disabled.sign;
+				}
+			},
 
 		getFunctionName: function () {
-			const error = new Error();
-			const stackLines = error.stack.split('\n');
-			// The stack trace format can vary; you may need to adjust the index
-			const callerLine = stackLines[2].trim();
-			const functionName = callerLine.split(' ')[1];
-			return functionName;
+			return getUtilityFunctionName();
 		},
 
 		getModalTitle: function () {
@@ -993,6 +956,16 @@ this.isActionSign():[${this.isActionSign()}] /
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				// Using rcdevsSettings.checked because if not checked, impossible to say if Settings are OK or KO
 				let localReturn = this.rcdevsSettings.checked && this.enabledApp.checked && this.signTypes.checked && (!this.enabledApp.sign || this.settingKO || (!this.signTypes.advanced.enabled && !this.signTypes.qualified.enabled && !this.signTypes.standard.enabled));
+				log.debug(`
+rcdevsSettings.checked:[${this.rcdevsSettings.checked}] /
+enabledApp.checked:[${this.enabledApp.checked}] /
+signTypes.checked:[${this.signTypes.checked}] /
+enabledApp.sign:[${this.enabledApp.sign}] /
+settingKO:[${this.settingKO}] /
+signTypes.advanced.enabled:[${this.signTypes.advanced.enabled}] /
+signTypes.qualified.enabled:[${this.signTypes.qualified.enabled}] /
+signTypes.standard.enabled:[${this.signTypes.standard.enabled}] /
+				`);
 				log.debug(`${this.getFunctionName()} : [${localReturn}]`);
 
 				return localReturn;
@@ -1092,12 +1065,12 @@ rcdevsSettings.validated:[${this.rcdevsSettings.validated}] /
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				log.debug('Refresh UI Vars');
 				this.actionSign = this.isActionSign();
+				this.settingKO = this.isSettingKO();
+				this.settingOK = this.isSettingOK();
 				this.disabledSign = this.isDisabledSign();
 				this.enabledSign = this.isEnabledSign();
 				this.file.message = this.getFilenameMessage();
 				this.ncModalAriaLabel = this.getNcModalAriaLabel();
-				this.settingKO = this.isSettingKO();
-				this.settingOK = this.isSettingOK();
 				this.axiosSrvRequest.success = this.isSrvRequestSuccess();
 				this.axiosSrvRequest.inProgress = this.isSrvRequestInProgress();
 			} catch (exception) {
@@ -1109,6 +1082,10 @@ rcdevsSettings.validated:[${this.rcdevsSettings.validated}] /
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
 				this.ui.title.chosen = this.getModalTitle();
+				this.modalBootstrap = {
+					inProgress: false,
+					done: false,
+				};
 
 				this.axiosChecking = {
 					abortCtrl: null,
@@ -1125,7 +1102,7 @@ rcdevsSettings.validated:[${this.rcdevsSettings.validated}] /
 					error: false,
 					message: null,
 				};
-				log.info(`Initialize axiosSrvRequest : [${JSON.stringify(this.axiosSrvRequest)}]`);
+				log.info(`[${this.getFunctionName()}] Initialize axiosSrvRequest : [${JSON.stringify(this.axiosSrvRequest)}]`);
 
 				this.axiosUser = {
 					abortCtrl: null,
@@ -1233,6 +1210,28 @@ rcdevsSettings.validated:[${this.rcdevsSettings.validated}] /
 			} catch (exception) {
 				log.error(`[${this.getFunctionName()}] ${exception}`);
 				showError(getT('An error occurred while performing the search'));
+			}
+		},
+
+		filterUsersListOption: function (option, label, search) {
+			try {
+				const query = String(search || '').trim().toLowerCase();
+				if (query.length === 0) {
+					return true;
+				}
+
+				const userId = String(option?.id || '').toLowerCase();
+				const displayName = String(option?.displayName || '').toLowerCase();
+				const subname = String(option?.subname || '').toLowerCase();
+				const normalizedLabel = String(label || '').toLowerCase();
+
+				return userId.includes(query)
+					|| displayName.includes(query)
+					|| subname.includes(query)
+					|| normalizedLabel.includes(query);
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+				return false;
 			}
 		},
 

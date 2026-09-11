@@ -21,6 +21,8 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Service;
 
 class ListsService

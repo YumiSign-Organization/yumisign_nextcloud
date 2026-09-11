@@ -86,7 +86,7 @@ export default {
 					)
 					.catch((error) => {
 						this.error = true;
-						console.log(error);
+						console.error(error);
 					});
 			} catch (error) {
 				console.error(error.message);
@@ -156,7 +156,7 @@ export default {
 				.catch((error) => {
 					this.requesting = false;
 					// eslint-disable-next-line
-					console.log(error);
+					console.error(error);
 				});
 		},
 

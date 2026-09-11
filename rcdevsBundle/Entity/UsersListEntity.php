@@ -21,11 +21,13 @@
  *
  */
 
-namespace OCA\RCDevs\Entity;
+declare(strict_types=1);
+
+namespace OCA\YumiSignNxtC\RCDevs\Entity;
 
 use Exception;
 use JsonSerializable;
-use OCA\RCDevs\Utility\Constantes\CstException;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstException;
 use OCP\Files\IRootFolder;
 use OCP\IConfig;
 use OCP\IUserManager;

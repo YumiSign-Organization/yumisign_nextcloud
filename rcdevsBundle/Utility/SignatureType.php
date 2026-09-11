@@ -21,9 +21,14 @@
  *
  */
 
-namespace OCA\RCDevs\Utility;
+declare(strict_types=1);
 
-use OCA\RCDevs\Utility\Constantes\CstRequest;
+namespace OCA\YumiSignNxtC\RCDevs\Utility;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstTransactionType;
 
 class SignatureType
 {
@@ -33,31 +38,33 @@ class SignatureType
 	public function __construct(
 		private bool|null $advanced = false,
 		private bool|null $qualified = false,
-		private bool|null $standard = false,
+		private bool|null $standard = false
 	) {
 		try {
 			$this->value = $advanced ?
-				CstRequest::ADVANCED
+				CstTransactionType::ADVANCED
 				: ($qualified ?
-					CstRequest::QUALIFIED :
+					CstTransactionType::QUALIFIED :
 					CstRequest::SIMPLE);
 			// Normalized value uses "Standard" instead of Simple. But Simple is needed for specific Modules
 			$this->valueNormalized = $advanced ?
-				CstRequest::ADVANCED
+				CstTransactionType::ADVANCED
 				: ($qualified ?
-					CstRequest::QUALIFIED :
-					CstRequest::STANDARD);
+					CstTransactionType::QUALIFIED :
+					CstTransactionType::STANDARD);
 			$this->standard = $standard || (!$advanced && !$qualified);
 		} catch (\Throwable $th) {
 			throw $th;
 		}
 	}
 
-	public function get(): string {
+	public function get(): string
+	{
 		return $this->value;
 	}
 
-	public function getNormalized(): string {
+	public function getNormalized(): string
+	{
 		return $this->valueNormalized;
 	}
 

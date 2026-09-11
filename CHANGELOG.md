@@ -6,6 +6,22 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.34.0
+- Nextcloud 34 version
+- Configurable personal folders for signed documents, separately for applicants and recipients.
+- Automatic folder creation after successful completion of the signature workflow.
+- Automatic retry of failed saves and numbered filenames to prevent overwriting.
+- Automatic Files refresh when signed documents become available.
+- Improved signature workflow handling and settings validation.
+
+1.33.0
+- Nextcloud 33 version
+- Configurable personal folders for signed documents, separately for applicants and recipients.
+- Automatic folder creation after successful completion of the signature workflow.
+- Automatic retry of failed saves and numbered filenames to prevent overwriting.
+- Automatic Files refresh when signed documents become available.
+- Improved signature workflow handling and settings validation.
+
 1.32.0
 - Nextcloud 32 version
 - Add Personal Settings to use YumiSign OAuth API

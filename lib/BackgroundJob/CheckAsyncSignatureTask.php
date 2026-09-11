@@ -21,24 +21,36 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\BackgroundJob;
 
+// RCDevs App
+use OCA\YumiSignNxtC\Constant\CstSettings;
+use OCA\YumiSignNxtC\Service\ConfigurationService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
-use OCP\IConfig;
-
+use OCP\IAppConfig;
 use OCA\YumiSignNxtC\Service\SignService;
 
 class CheckAsyncSignatureTask extends TimedJob
 {
 	private $signService;
 
-	public function __construct(ITimeFactory $time, SignService $signService, IConfig $config)
-	{
+	public function __construct(
+		ITimeFactory $time,
+		SignService $signService,
+		ConfigurationService $configurationService,
+		IAppConfig $appConfig
+	) {
 		parent::__construct($time);
 		$this->signService = $signService;
 
-		$cron_interval = (int) $config->getAppValue('yumisign_nextcloud', 'cron_interval', 5) * 59;
+		$cron_interval = (int) $appConfig->getValueInt(
+			$configurationService->getAppId(),
+			CstSettings::CRON_INTERVAL,
+			default: $configurationService->getCronInterval(),
+		) * 59;
 
 		parent::setInterval($cron_interval);
 	}

@@ -27,6 +27,8 @@ $requirements = [
 
 return [
 	'routes' => [
+		['name' => 'signedFolder#read', 'url' => '/settings/signed-folders', 'verb' => 'GET'],
+		['name' => 'signedFolder#save', 'url' => '/settings/signed-folders', 'verb' => 'POST'],
 		/*
 		OAUTH
 		*/
@@ -106,7 +108,7 @@ return [
 		SIGNATURES
 		*/
 		[
-			'name'	=> 'sign#webhook',
+			'name'	=> 'webhook#receive',
 			'url'	=> '/webhook',
 			'verb'	=> 'POST'
 		],
@@ -171,16 +173,22 @@ return [
 			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
-		[
-			'name'			=> 'AdminSettings#checkServerUrl',
-			'url'			=> '/api/{apiVersion}/settings/check',
-			'verb'			=> 'GET',
-			'requirements'	=> $requirements,
-		],
-		[
-			'name'			=> 'AdminSettings#checkWorkspaceId',
-			'url'			=> '/api/{apiVersion}/settings/check/workspace/id',
-			'verb'			=> 'GET',
+			[
+				'name'			=> 'AdminSettings#checkServerUrl',
+				'url'			=> '/api/{apiVersion}/settings/check',
+				'verb'			=> 'GET',
+				'requirements'	=> $requirements,
+			],
+			[
+				'name'			=> 'AdminSettings#checkModalBootstrap',
+				'url'			=> '/api/{apiVersion}/settings/check/modal/bootstrap',
+				'verb'			=> 'GET',
+				'requirements'	=> $requirements,
+			],
+			[
+				'name'			=> 'AdminSettings#checkWorkspaceId',
+				'url'			=> '/api/{apiVersion}/settings/check/workspace/id',
+				'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 		[
@@ -221,6 +229,12 @@ return [
 			'name'			=> 'Sign#signLocalAsyncStandard',
 			'url'			=> '/api/{apiVersion}/sign/local/async/standard',
 			'verb'			=> 'POST',
+			'requirements'	=> $requirements,
+		],
+		[
+			'name'			=> 'Ui#pollRefreshSignal',
+			'url'			=> '/api/{apiVersion}/ui/refresh',
+			'verb'			=> 'GET',
 			'requirements'	=> $requirements,
 		],
 	],

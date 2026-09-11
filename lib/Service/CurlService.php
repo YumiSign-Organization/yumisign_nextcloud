@@ -21,24 +21,42 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Service;
 
 use CURLFile;
 use Exception;
-use OCA\RCDevs\Entity\CurlEntity;
-use OCA\RCDevs\Service\CurlService as RCDevsCurlService;
-use OCA\RCDevs\Service\FileService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstCurl;
-use OCA\YumiSignNxtC\Utility\Constantes\CstException;
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCP\IConfig;
+use OCA\YumiSignNxtC\RCDevs\Entity\CurlEntity;
+use OCA\YumiSignNxtC\RCDevs\Service\CurlService as RCDevsCurlService;
+use OCA\YumiSignNxtC\RCDevs\Service\FileService;
+use OCA\YumiSignNxtC\Constant\CstCurl;
+use OCA\YumiSignNxtC\Constant\CstException;
+use OCA\YumiSignNxtC\Constant\CstLogMessages;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCP\IAppConfig;
 
 class CurlService extends RCDevsCurlService
 {
 	private		ConfigurationService	$configurationService;
 
+	private function isLocalStubTlsUrl(
+		string $url
+	): bool {
+		$parsedUrl = parse_url($url);
+		$scheme = strtolower((string) ($parsedUrl['scheme'] ?? ''));
+		$host = strtolower((string) ($parsedUrl['host'] ?? ''));
+		$port = intval($parsedUrl['port'] ?? 443);
+
+		return (
+			$scheme === 'https'
+			&& $host === 'devnextcloud'
+			&& $port === 18080
+		);
+	}
+
 	public function __construct(
-		private	IConfig		$config,
+		private	IAppConfig		$config,
 		private	LogRCDevs	$logRCDevs,
 	) {
 		parent::__construct(
@@ -52,13 +70,27 @@ class CurlService extends RCDevsCurlService
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
+	public function setCurlEnv(
+		string $url,
+		string $requestType,
+		bool $contentTypeJson = true
+	): void {
+		parent::setCurlEnv($url, $requestType, $contentTypeJson);
 
-	public function addPreferences(array $dataPost, int $workflowId): CurlEntity
-	{
+		// Local stub certificate is self-signed in dev environment.
+		if ($this->isLocalStubTlsUrl($url)) {
+			$this->setOpt(CURLOPT_SSL_VERIFYPEER, false);
+			$this->setOpt(CURLOPT_SSL_VERIFYHOST, 0);
+		}
+	}
+
+	public function addPreferences(
+		array $dataPost,
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -76,14 +108,14 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			$this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPost));
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -91,8 +123,10 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function addRecipients(array $dataPut, int $workflowId): CurlEntity
-	{
+	public function addRecipients(
+		array $dataPut,
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -101,14 +135,14 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			$this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPut));
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			// $return = new CurlEntity();
 			throw $th;
@@ -117,8 +151,10 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function addSteps(array $dataPost, int $workflowId): CurlEntity
-	{
+	public function addSteps(
+		array $dataPost,
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -130,14 +166,14 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			$this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPost));
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -145,8 +181,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function cancelWorkflow(int $workflowId): CurlEntity
-	{
+	public function cancelWorkflow(
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -154,14 +191,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlCancel($workflowId), CstCurl::PUT);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -169,8 +206,10 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function createWorkflow(array $dataPost, string $workflowName): CurlEntity
-	{
+	public function createWorkflow(
+		array $dataPost,
+		string $workflowName
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -188,7 +227,9 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			// $this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPost));
 			$this->setOpt(CURLOPT_POSTFIELDS, $dataPost);
-			$this->logRCDevs->debug('Data sent to YumiSign server : ' . json_encode($dataPost), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$dataPostTmp=$dataPost;
+			unset($dataPostTmp['document']);
+			$this->logRCDevs->debug('Data sent to YumiSign server : ' . json_encode($dataPostTmp), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
@@ -205,7 +246,7 @@ class CurlService extends RCDevsCurlService
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -213,8 +254,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function createWorkspace(array $dataPost): CurlEntity
-	{
+	public function createWorkspace(
+		array $dataPost
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -223,14 +265,14 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			$this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPost));
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -238,8 +280,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function deleteWorkflows(array $dataPost): CurlEntity
-	{
+	public function deleteWorkflows(
+		array $dataPost
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -248,14 +291,14 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			$this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPost));
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -263,8 +306,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function getDebrief(int $workflowId): CurlEntity
-	{
+	public function getDebrief(
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -272,14 +316,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlDebrief($workflowId), CstCurl::GET);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -287,8 +331,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function getDocument(string $url): CurlEntity
-	{
+	public function getDocument(
+		string $url
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -297,14 +342,14 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_VERBOSE, true);
 			$this->setOpt(CURLOPT_HEADER, 0);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -312,8 +357,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function getEnvelopes(array $envelopesIds): CurlEntity
-	{
+	public function getEnvelopes(
+		array $envelopesIds
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -321,14 +367,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlEnvelopes($envelopesIds), CstCurl::GET, contentTypeJson: false);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -337,8 +383,13 @@ class CurlService extends RCDevsCurlService
 	}
 
 	//	TODO	TBR
-	public function getPostDataArray(string $workflowName, string $applicantName, FileService $fileToSign, string $signType, int $expiryDate): array
-	{
+	public function getPostDataArray(
+		string $workflowName,
+		string $applicantName,
+		FileService $fileToSign,
+		string $signType,
+		int $expiryDate
+	): array {
 		$return = [];
 		try {
 			$return = array(
@@ -353,7 +404,7 @@ class CurlService extends RCDevsCurlService
 				'senderName' => $applicantName,
 			);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = [];
 			throw new Exception(CstException::POST_DATA_ARRAY, 1);
 		}
@@ -361,8 +412,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function getSession(int $workflowId): CurlEntity
-	{
+	public function getSession(
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -370,14 +422,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlSession($workflowId), CstCurl::GET);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -394,14 +446,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlWorkflows(), CstCurl::GET, false);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -418,14 +470,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlWorkspacesId(), CstCurl::GET, false);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -433,8 +485,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function retrieveAccessTokenRefreshToken(array $dataPost): CurlEntity
-	{
+	public function retrieveAccessTokenRefreshToken(
+		array $dataPost
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -444,7 +497,7 @@ class CurlService extends RCDevsCurlService
 			$this->setOpt(CURLOPT_POSTFIELDS, json_encode($dataPost));
 
 			$this->logRCDevs->debug(sprintf('DataPost :--%s--', json_encode($dataPost)),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
@@ -456,7 +509,7 @@ class CurlService extends RCDevsCurlService
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}
@@ -464,8 +517,9 @@ class CurlService extends RCDevsCurlService
 		return $return;
 	}
 
-	public function startWorkflow(int $workflowId): CurlEntity
-	{
+	public function startWorkflow(
+		int $workflowId
+	): CurlEntity {
 		$return = new CurlEntity();
 
 		try {
@@ -473,14 +527,14 @@ class CurlService extends RCDevsCurlService
 			$this->setCurlEnv($this->configurationService->getUrlStartWorkflow($workflowId), CstCurl::PUT);
 			$this->setOpt(CURLOPT_VERBOSE, true);
 
-			$this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			// $this->logRCDevs->debug(curl_getinfo($this->curlHandleBundle, CURLINFO_HEADER_OUT),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Call YumiSign server
 			$return = $this->getCurlResponse();
 
 			curl_close($this->curlHandleBundle);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$this->logRCDevs->error(sprintf("The cUrl response is : [%s]", json_encode($return)),					__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$return = new CurlEntity();
 		}

@@ -100,7 +100,7 @@
 import '../../styles/rcdevsListing.css';
 import {appName, baseUrl, nbItemsPerPage, timestamp} from '../../javascript/config.js';
 import {generateFilePath} from '@nextcloud/router';
-import {getAppUrl, getT, isIssueResponse, isValidResponse, log} from '../../javascript/utility.js';
+import {CDEM, getAppUrl, getFunctionName as getUtilityFunctionName, getT, isValidResponse, log} from '../../javascript/utility.js';
 import axios from '@nextcloud/axios';
 import ConfirmDialogue from './CancelTransactionForce.vue';
 import moment from 'moment';
@@ -144,14 +144,15 @@ export default {
 		this.ui.messages.retrieving = getT('Retrieving...');
 
 		this.ui.pictures = [];
-		this.ui.pictures.advanced = generateFilePath(appName, '', 'img/') + 'signTypeAdvanced.svg';
-		this.ui.pictures.qualified = generateFilePath(appName, '', 'img/') + 'signTypeQualified.svg';
-		this.ui.pictures.standard = generateFilePath(appName, '', 'img/') + 'signTypeStandard.svg';
+		this.ui.pictures.advanced = generateFilePath(appName, '', 'img/') + 'sign_type_advanced.svg';
+		this.ui.pictures.qualified = generateFilePath(appName, '', 'img/') + 'sign_type_qualified.svg';
+		this.ui.pictures.standard = generateFilePath(appName, '', 'img/') + 'sign_type_standard.svg';
 
 		return {
 			getT: getT,
 			pageCount: null,
 			requesting: false,
+			softRefreshPending: false,
 			transactions: [],
 			canceling: [],
 			deleting: [],
@@ -183,11 +184,43 @@ export default {
 		this.NB_ITEMS_PER_PAGE = nbItemsPerPage; // default value if API call fails
 		this.loadingImg = generateFilePath('core', '', 'img/') + 'loading.gif';
 		this.requesting = true;
+		this.ymsSoftRefreshHandler = this.onSoftRefreshTransactions;
+		window.addEventListener('yms:refresh:transactions', this.ymsSoftRefreshHandler);
 
 		this.axiosItemsPerPage();
 	},
+	beforeDestroy() {
+		if (this.ymsSoftRefreshHandler) {
+			window.removeEventListener('yms:refresh:transactions', this.ymsSoftRefreshHandler);
+		}
+	},
 
 	methods: {
+		onSoftRefreshTransactions: function (event) {
+			try {
+				const scope = String(event?.detail?.scope || '').trim().toLowerCase();
+				if (scope !== 'transactions' && scope !== 'all') {
+					return;
+				}
+
+				if (this.isSrvRequestInProgress()) {
+					this.softRefreshPending = true;
+					return;
+				}
+
+				this.softRefreshPending = false;
+
+				if (!this.rcdevsItemsPerPage.validated) {
+					this.axiosItemsPerPage();
+					return;
+				}
+
+				this.axiosTransactions();
+			} catch (exception) {
+				log.error(`[${this.getFunctionName()}] ${exception}`);
+			}
+		},
+
 		axiosItemsPerPage: function () {
 			try {
 				log.debug(`[${this.getFunctionName()}] Running...`);
@@ -199,27 +232,28 @@ export default {
 					.get(getAppUrl(this.apis.uiItemsPage), {
 						signal: this.axiosSrvRequest.abortCtrl.signal,
 					})
-					.then((response) => {
-						log.debug(`[${this.getFunctionName()}], Response for ${JSON.stringify(response.data)}`);
+						.then((response) => {
+							log.debug(`[${this.getFunctionName()}], Response for ${JSON.stringify(response.data)}`);
+							const cdem = CDEM(response.data);
 
-						if (isIssueResponse(response)) {
-							throw new Error(`No property named "code" in Axios response`);
-						}
+							if (cdem.code !== 0) {
+								throw new Error(cdem.message ?? `Items per page query failed`);
+							}
 
-						// Check results ItemsPerPage
-						if (!response.data.hasOwnProperty('itemsPerPage')) {
-							throw new Error('Number of items per page is missing');
-						}
+							// Check results ItemsPerPage
+							if (!cdem.data || !Object.prototype.hasOwnProperty.call(cdem.data, 'itemsPerPage')) {
+								throw new Error('Number of items per page is missing');
+							}
 
-						log.debug(`isValidResponse(response):[${isValidResponse(response)}]`);
+							log.debug(`isValidResponse(response):[${isValidResponse(response)}]`);
 
-						this.axiosSrvRequest.error = !(this.axiosSrvRequest.success = true);
-						this.axiosSrvRequest.message = response.data.message;
+							this.axiosSrvRequest.error = !(this.axiosSrvRequest.success = true);
+							this.axiosSrvRequest.message = cdem.message;
 
-						this.rcdevsItemsPerPage.validated = isValidResponse(response);
+							this.rcdevsItemsPerPage.validated = isValidResponse(response);
 
-						this.NB_ITEMS_PER_PAGE = response.data.itemsPerPage;
-					})
+							this.NB_ITEMS_PER_PAGE = cdem.data.itemsPerPage;
+						})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
 							this.axiosSrvRequest.message = this.ui.axios.requestCancelled;
@@ -262,23 +296,24 @@ export default {
 					})
 					.then((response) => {
 						log.debug(`[${this.getFunctionName()}], Response for ${JSON.stringify(response.data)}`);
+						const cdem = CDEM(response.data);
 
-						if (isIssueResponse(response)) {
-							throw new Error(`No property named "code" in Axios response`);
+						if (cdem.code !== 0) {
+							throw new Error(cdem.message ?? `Transaction query failed`);
 						}
 						log.debug(`isValidResponse(response):[${isValidResponse(response)}]`);
 
 						this.axiosSrvRequest.error = !(this.axiosSrvRequest.success = true);
-						this.axiosSrvRequest.message = response.data.message;
+						this.axiosSrvRequest.message = cdem.message;
 
 						this.rcdevsTransactions.validated = isValidResponse(response);
 
-						this.pageCount = Math.ceil(response.data.data.count / this.NB_ITEMS_PER_PAGE);
+						this.pageCount = Math.ceil(cdem.data.count / this.NB_ITEMS_PER_PAGE);
 						log.debug(`this.pageCount:[${this.pageCount}]`);
 
-						this.canceling.splice(response.data.data.transactions.length);
-						this.deleting.splice(response.data.data.transactions.length);
-						this.transactions = this.getTransactions(response.data.data.transactions);
+						this.canceling.splice(cdem.data.transactions.length);
+						this.deleting.splice(cdem.data.transactions.length);
+						this.transactions = this.getTransactions(cdem.data.transactions);
 					})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
@@ -293,6 +328,9 @@ export default {
 						this.axiosSrvRequest.inProgress = false;
 						this.rcdevsTransactions.retrieved = true;
 						this.refreshUiVariables();
+						if (this.softRefreshPending) {
+							this.onSoftRefreshTransactions({ detail: { scope: 'transactions' } });
+						}
 					});
 			} catch (exception) {
 				log.error(`[${this.getFunctionName()}] ${exception}`);
@@ -376,7 +414,7 @@ export default {
 				})
 				.catch((error) => {
 					this.requesting = false;
-					console.log(error);
+					console.error(error);
 				});
 		},
 
@@ -416,12 +454,7 @@ export default {
 		},
 
 		getFunctionName: function () {
-			const error = new Error();
-			const stackLines = error.stack.split('\n');
-			// The stack trace format can vary; you may need to adjust the index
-			const callerLine = stackLines[2].trim();
-			const functionName = callerLine.split(' ')[1];
-			return functionName;
+			return getUtilityFunctionName();
 		},
 
 		getTransactions(responseTransactions) {

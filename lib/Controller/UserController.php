@@ -21,14 +21,20 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
+// RCDevs App
+use OCA\YumiSignNxtC\Service\ConfigurationService;
+
+// Nextcloud Core
 use OC\AppFramework\Http;
-use OCA\YumiSignNxtC\AppInfo\Application as YumiSignApp;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\Collaboration\Collaborators\ISearch;
+use OCP\IAppConfig;
 use OCP\IRequest;
 use OCP\IUserManager;
 use OCP\IUserSession;
@@ -36,19 +42,23 @@ use OCP\Share\IShare;
 
 class UserController extends Controller
 {
+	private ConfigurationService $configurationService;
+
 	//	TODO	Add exceptions management
 	/** @var IUserManager */
 
 	public function __construct(
-		private IAppManager $appManager,
 		$AppName,
 		IRequest $request,
-		private string $userId,
-		private IUserManager $userManager,
+		private IAppConfig $config,
+		private IAppManager $appManager,
 		private ISearch $search,
-		private IUserSession $userSession
+		private IUserManager $userManager,
+		private IUserSession $userSession,
+		private string $userId,
 	) {
 		parent::__construct($AppName, $request);
+		$this->configurationService = new ConfigurationService($config);
 	}
 
 	/**
@@ -116,7 +126,7 @@ class UserController extends Controller
 					}
 					$userCache[$userId] = $user;
 				}
-				return $this->appManager->isEnabledForUser(YumiSignApp::APP_ID(), $user);
+				return $this->appManager->isEnabledForUser($this->configurationService->getAppId(), $user);
 			};
 
 			$totalResults = count($result['exact']['users'] ?? []) + count($result['users'] ?? []);

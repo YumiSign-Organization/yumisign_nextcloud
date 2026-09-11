@@ -21,34 +21,33 @@
  *
  */
 
-namespace OCA\RCDevs\Controller;
+declare(strict_types=1);
 
+namespace OCA\YumiSignNxtC\RCDevs\Controller;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstLogMessages;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\RCDevs\Service\ConfigurationService;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+
+// Nextcloud Core
 use Exception;
-use OCA\RCDevs\Service\ConfigurationService;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
-use OCA\RCDevs\Utility\LogRCDevs;
 use OCP\AppFramework\Controller;
 use OCP\IRequest;
 
 class SignController extends Controller
 {
 	public function __construct(
-		IRequest							$request,
-		private ConfigurationService		$configurationService,
-		private LogRCDevs					$logRCDevs,
-		string								$AppName,
+		IRequest $request,
+		private ConfigurationService $configurationService,
+		private LogRCDevs $logRCDevs,
+		string $AppName
 	) {
 		$this->request = $request;
 		parent::__construct($AppName, $request);
-		// $this->currentUserId = $UserId;
-
-		// $this->userManager = $userManager;
-
-		// // Define "Sender name" which will be displayed on mobile push/email : "You received a signature request from ..."
-		// $displayName = $this->userManager->get($this->currentUserId)->getDisplayName();
-		// if (empty($displayName)) {
-		// 	$displayName = $this->$this->currentUserId;
-		// }
 	}
 
 	/** ******************************************************************************************
@@ -70,33 +69,33 @@ class SignController extends Controller
 			switch (true) {
 				case $this->configurationService->isEnabledSign() && $this->configurationService->isEnabledSignTypeAdvanced():
 					$returned = [
-						CstRequest::CODE	=> 1,
-						CstRequest::DATA	=> null,
-						CstRequest::ERROR	=> null,
-						CstRequest::MESSAGE	=> null,
+						CstReturn::CODE	=> 1,
+						CstReturn::DATA	=> null,
+						CstReturn::ERROR	=> null,
+						CstReturn::MESSAGE	=> null,
 					];
 					break;
 
 				case !$this->configurationService->isEnabledSign():
-					throw new Exception('Sign process is disabled', 1);
+					throw new Exception(CstLogMessages::SIGN_DISABLED, 1);
 					break;
 
 				case !$this->configurationService->isEnabledSignTypeAdvanced():
-					throw new Exception('Cannot sign with disabled Sign type', 1);
+					throw new Exception(CstLogMessages::CANNOT_SIGN_DISABLED, 1);
 					break;
 
 				default:
-					throw new Exception('Something went wrong during this process', 1);
+					throw new Exception(CstLogMessages::SOMETHING_WRONG, 1);
 					break;
 			}
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -114,33 +113,33 @@ class SignController extends Controller
 			switch (true) {
 				case $this->configurationService->isEnabledSign() && $this->configurationService->isEnabledSignTypeQualified():
 					$returned = [
-						CstRequest::CODE	=> 1,
-						CstRequest::DATA	=> null,
-						CstRequest::ERROR	=> null,
-						CstRequest::MESSAGE	=> null,
+						CstReturn::CODE	=> 1,
+						CstReturn::DATA	=> null,
+						CstReturn::ERROR	=> null,
+						CstReturn::MESSAGE	=> null,
 					];
 					break;
 
 				case !$this->configurationService->isEnabledSign():
-					throw new Exception('Sign process is disabled', 1);
+					throw new Exception(CstLogMessages::SIGN_DISABLED, 1);
 					break;
 
 				case !$this->configurationService->isEnabledSignTypeQualified():
-					throw new Exception('Cannot sign with disabled Sign type', 1);
+					throw new Exception(CstLogMessages::CANNOT_SIGN_DISABLED, 1);
 					break;
 
 				default:
-					throw new Exception('Something went wrong during this process', 1);
+					throw new Exception(CstLogMessages::SOMETHING_WRONG, 1);
 					break;
 			}
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -158,33 +157,33 @@ class SignController extends Controller
 			switch (true) {
 				case $this->configurationService->isEnabledSign() && $this->configurationService->isEnabledSignTypeStandard():
 					$returned = [
-						CstRequest::CODE	=> 1,
-						CstRequest::DATA	=> null,
-						CstRequest::ERROR	=> null,
-						CstRequest::MESSAGE	=> null,
+						CstReturn::CODE	=> 1,
+						CstReturn::DATA	=> null,
+						CstReturn::ERROR	=> null,
+						CstReturn::MESSAGE	=> null,
 					];
 					break;
 
 				case !$this->configurationService->isEnabledSign():
-					throw new Exception('Sign process is disabled', 1);
+					throw new Exception(CstLogMessages::SIGN_DISABLED, 1);
 					break;
 
 				case !$this->configurationService->isEnabledSignTypeStandard():
-					throw new Exception('Cannot sign with disabled Sign type', 1);
+					throw new Exception(CstLogMessages::CANNOT_SIGN_DISABLED, 1);
 					break;
 
 				default:
-					throw new Exception('Something went wrong during this process', 1);
+					throw new Exception(CstLogMessages::SOMETHING_WRONG, 1);
 					break;
 			}
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 

@@ -21,22 +21,29 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\RCDevs\Utility\Helpers;
-use OCA\RCDevs\Utility\LogRCDevs;
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\Helpers;
+use OCA\YumiSignNxtC\Constant\CstRequest;
+use OCA\YumiSignNxtC\Constant\CstReturn;
+use OCA\YumiSignNxtC\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\Service\ConfigurationService;
+use OCA\YumiSignNxtC\Service\TokenService;
+
+// Nextcloud Core
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\RedirectResponse;
+use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Http\Client\IClientService;
+use OCP\IAppConfig;
 use OCP\IRequest;
 use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\Security\ISecureRandom;
-use OCP\AppFramework\Utility\ITimeFactory;
-use OCP\IConfig;
-use OCP\Http\Client\IClientService;
-use OCA\YumiSignNxtC\Service\ConfigurationService;
-use OCA\YumiSignNxtC\Service\TokenService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
 
 class OAuthController extends Controller
 {
@@ -45,24 +52,25 @@ class OAuthController extends Controller
 
 	public function __construct(
 		IRequest $request,
-		private	TokenService		$tokenService,
+		private TokenService $tokenService,
 		private IClientService $http,
-		private IConfig $config,
+		private IAppConfig $config,
 		private ISecureRandom $secureRandom,
 		private ISession $session,
 		private ITimeFactory $timeFactory,
 		private IURLGenerator $urlGen,
-		private LogRCDevs			$logRCDevs,
+		private LogRCDevs $logRCDevs,
 		private string $UserId,
-		string $AppName,
+		string $AppName
 	) {
 		parent::__construct($AppName, $request);
 		$this->configurationService = new ConfigurationService($config);
 	}
 
 	/** Helper: base64url without padding */
-	private function b64url(string $bin): string
-	{
+	private function b64url(
+		string $bin
+	): string {
 		return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
 	}
 
@@ -165,7 +173,7 @@ class OAuthController extends Controller
 			$this->UserId
 		);
 
-		$redirectTo	= Helpers::getIfExists('redirect_to', $returned[CstRequest::DATA], returnNull: false);
+		$redirectTo	= Helpers::getIfExists('redirect_to', $returned[CstReturn::DATA], returnNull: false);
 		$this->logRCDevs->debug('YMS redirect : ' . $redirectTo, __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 		return new RedirectResponse($origin . $redirectTo);

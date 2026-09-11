@@ -21,35 +21,42 @@
  *
  */
 
-namespace OCA\RCDevs\Service;
+declare(strict_types=1);
 
+namespace OCA\YumiSignNxtC\RCDevs\Service;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstCommon;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstCurl;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstException;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstSettings;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\RCDevs\Db\JobMapper;
+use OCA\YumiSignNxtC\RCDevs\Entity\CurlEntity;
+use OCA\YumiSignNxtC\RCDevs\Enum\CDEMLogLevel;
+use OCA\YumiSignNxtC\RCDevs\Dto\CDEM;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\Helpers;
+
+// Nextcloud Core
 use Exception;
-use OCA\RCDevs\Db\SignSessionMapper;
-use OCA\RCDevs\Entity\CurlEntity;
-use OCA\RCDevs\Utility\Constantes\CstCommon;
-use OCA\RCDevs\Utility\Constantes\CstCurl;
-use OCA\RCDevs\Utility\Constantes\CstException;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
-use OCA\RCDevs\Utility\Helpers;
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
-use OCP\IConfig;
+use OCP\IAppConfig;
 use OCP\IL10N;
+use Throwable;
 
 class SettingsService
 {
 	private	ConfigurationService	$configurationService;
 	private	CurlService				$curlService;
-	private string					$userId;
 
 	public function __construct(
-		IConfig							$config,
+		IAppConfig						$config,
 		private		IL10N				$l10nRcdevsSettingsService,
-		private		SignSessionMapper	$mapper,
+		private		JobMapper			$mapper,
 		protected	LogRCDevs			$logRCDevs,
-		string							$UserId,
 	) {
-		$this->userId = $UserId;
 		$this->configurationService = new ConfigurationService($config);
 
 		$_credentialKey = "{$this->configurationService->getApiKeyName()}:{$this->configurationService->getApiKey()}";
@@ -61,9 +68,18 @@ class SettingsService
 	 * PUBLIC
 	 ****************************************************************************************** */
 
-	public function checkServerUrl(string $serverUrl): array
-	{
-		$return = [];
+	/**
+	 * Check if server is online
+	 * 
+	 * @param string $serverUrl 
+	 * @return array 
+	 * @throws Throwable 
+	 * @throws Exception 
+	 */
+	public function checkServerUrl(
+		string $serverUrl,
+	): array {
+		$cdem = new CDEM();
 
 		try {
 			$this->logRCDevs->debug(sprintf('$serverUrl: %s', $serverUrl), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
@@ -77,6 +93,10 @@ class SettingsService
 			/** @var CurlEntity $curlEntity */
 			// $curlEntity = new CurlEntity();
 			$curlEntity = $this->curlService->getCurlResponse();
+			$this->logRCDevs->debug(
+				sprintf('checkServerUrl raw response: [%s]', $curlEntity->getBody()),
+				__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . __FILE__ . ':' . __LINE__,
+			);
 
 			$this->curlService->closeHandle();
 
@@ -85,53 +105,69 @@ class SettingsService
 			$this->curlService->checkCurlBody(__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// At this point, this response is OK
-			$return[CstCommon::NAME]			= CstCommon::CONNECTED;
-			$return[CstCommon::STATUS]			= true;
-			$return[CstRequest::CODE]		= 1;
-			$return[CstRequest::MESSAGE]	= CstCommon::CONNECTED;
+			$cdem->setOk(
+				data: [
+					CstCommon::NAME		=> CstCommon::CONNECTED,
+					CstCommon::STATUS	=> true,
+				],
+				message: CstCommon::CONNECTED,
+			);
 		} catch (\Throwable $th) {
 			$thCode = CstException::CONNECTION_ERROR;
 			$this->logRCDevs->error(vsprintf('%s [%s]', [$thCode, $th->getMessage()]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			$return = [];
-			$return[CstCommon::NAME]			= null;
-			$return[CstCommon::STATUS]			= false;
-			$return[CstRequest::CODE]		= 0;
-			$return[CstRequest::MESSAGE]	= $thCode;
+			$cdem->setWarning(
+				exception: $th,
+				logRCDevs: $this->logRCDevs,
+				data: [
+					CstCommon::NAME		=> null,
+					CstCommon::STATUS	=> false,
+				],
+			);
 		}
 
-		return $return;
+		return $cdem->toArray();
 	}
 
+	/**
+	 * Check if Signatures Types are enabled or disabled
+	 * 
+	 * @return array 
+	 * @throws Throwable 
+	 * @throws Exception 
+	 */
 	public function checkSignTypes(): array
 	{
-		$return = [];
+		$cdem = new CDEM();
 
 		try {
-			$return[CstRequest::SIGNTYPEADVANCED]	= $this->configurationService->isEnabledSignTypeAdvanced();
-			$return[CstRequest::SIGNTYPEQUALIFIED]	= $this->configurationService->isEnabledSignTypeQualified();
-			$return[CstRequest::SIGNTYPESTANDARD]	= $this->configurationService->isEnabledSignTypeStandard();
-
-			$this->logRCDevs->debug(sprintf('isEnabledSignTypeAdvanced:		%b', $this->configurationService->isEnabledSignTypeAdvanced()),		__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			$this->logRCDevs->debug(sprintf('isEnabledSignTypeQualified:	%b', $this->configurationService->isEnabledSignTypeQualified()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			$this->logRCDevs->debug(sprintf('isEnabledSignTypeStandard:		%b', $this->configurationService->isEnabledSignTypeStandard()),		__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$data = [
+				CstSettings::SIGN_TYPE_ADVANCED	=> $this->configurationService->isEnabledSignTypeAdvanced(),
+				CstSettings::SIGN_TYPE_QUALIFIED	=> $this->configurationService->isEnabledSignTypeQualified(),
+				CstSettings::SIGN_TYPE_STANDARD	=> $this->configurationService->isEnabledSignTypeStandard(),
+			];
 
 			if (!$this->configurationService->isEnabledSignTypesAll()) {
 				throw new Exception(CstException::SIGN_TYPES_DISABLED);
 			}
-		} catch (\Throwable $th) {
-			$this->logRCDevs->error($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			$return = [];
-			$return[CstCommon::NAME]		= null;
-			$return[CstCommon::STATUS]		= false;
-			$return[CstRequest::CODE]		= 0;
-			$return[CstRequest::MESSAGE]	= $th->getMessage();
 
-			$return[CstRequest::SIGNTYPEADVANCED]	= null;
-			$return[CstRequest::SIGNTYPEQUALIFIED]	= null;
-			$return[CstRequest::SIGNTYPESTANDARD]	= null;
+			$cdem->setOk(
+				data: $data,
+				logRCDevs: $this->logRCDevs,
+				logLevel: CDEMLogLevel::DEBUG
+			);
+		} catch (\Throwable $th) {
+			$cdem->setWarning(
+				exception: $th,
+				logRCDevs: $this->logRCDevs,
+				data: [
+					CstSettings::SIGN_TYPE_ADVANCED		=> null,
+					CstSettings::SIGN_TYPE_QUALIFIED	=> null,
+					CstSettings::SIGN_TYPE_STANDARD		=> null,
+				],
+			);
 		}
 
-		return $return;
+		return $cdem->toArray();
 	}
 
 	public function lastJobRun(): array
@@ -139,35 +175,37 @@ class SettingsService
 		$return = [];
 
 		try {
-			$cronJob = $this->mapper->findJob();
-			$reservedAt	= Helpers::getArrayData($cronJob, 'reserved_at', false, 'No "Reservation" column found in query result');
-			$lastRun	= Helpers::getArrayData($cronJob, 'last_run', false, 'No "Last Run" column found in query result');
+			$cronResponse = $this->mapper->findLastRun();
+			$cronJob = Helpers::getIfExists(CstReturn::DATA, $cronResponse, returnNull: false);
+
+			$reservedAt = intval(Helpers::getArrayData(is_array($cronJob) ? $cronJob : null, 'reserved_at', false, 'No "Reservation" column found in query result'));
+			$lastRun = intval(Helpers::getArrayData(is_array($cronJob) ? $cronJob : null, 'last_run', false, 'No "Last Run" column found in query result'));
 
 			switch (true) {
 				case $reservedAt === 0 && $lastRun === 0:
-					$return[CstRequest::CODE]		= 1;
-					$return[CstCommon::STATUS]			= CstCommon::SUCCESS;
-					$return[CstRequest::MESSAGE]	= $this->l10nRcdevsSettingsService->t('The cron job is activated');
+					$return[CstReturn::CODE]	= 1;
+					$return[CstCommon::STATUS]	= CstCommon::SUCCESS;
+					$return[CstReturn::MESSAGE]	= $this->l10nRcdevsSettingsService->t('The cron job is activated; it has never run yet');
 					break;
 
 				case $reservedAt === 0 && $lastRun !== 0:
-					$return[CstRequest::CODE]		= 1;
-					$return[CstCommon::STATUS]			= CstCommon::SUCCESS;
-					$return[CstRequest::MESSAGE]	= $this->l10nRcdevsSettingsService->t('The cron job is activated; the last time the job ran was at %s', [date('Y-m-d_H:i:s', $lastRun)]);
+					$return[CstReturn::CODE]	= 1;
+					$return[CstCommon::STATUS]	= CstCommon::SUCCESS;
+					$return[CstReturn::MESSAGE]	= $this->l10nRcdevsSettingsService->t('The cron job is activated; the last time the job ran was at %s', [date('Y-m-d_H:i:s', $lastRun)]);
 					break;
 
 				default:
-					$return[CstRequest::CODE]		= 0;
-					$return[CstCommon::STATUS]			= CstCommon::ERROR;
-					$return[CstRequest::MESSAGE]	= $this->l10nRcdevsSettingsService->t('The cron job was disabled at %s', [date('Y-m-d_H:i:s', $reservedAt)]);
+					$return[CstReturn::CODE]	= 0;
+					$return[CstCommon::STATUS]	= CstCommon::ERROR;
+					$return[CstReturn::MESSAGE]	= $this->l10nRcdevsSettingsService->t('The cron job was disabled at %s', [date('Y-m-d_H:i:s', $reservedAt)]);
 					break;
 			}
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error($this->l10nRcdevsSettingsService->t('Checking process failed at %s', [date('Y-m-d_H:i:s')]), __FUNCTION__, true);
+			$this->logRCDevs->error(vsprintf('Checking process failed at %s: %s', [date('Y-m-d_H:i:s'), $th->getMessage()]), __FUNCTION__);
 			$return = [
-				CstRequest::CODE	=> false,
+				CstReturn::CODE	=> 0,
 				CstCommon::STATUS	=> CstCommon::ERROR,
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -179,18 +217,18 @@ class SettingsService
 		$return = [];
 
 		try {
-			$this->mapper->resetJob();
+			$this->mapper->reset();
 			// No exception => query is OK (does not mean data is updated)
 			$return = [
-				CstRequest::CODE	=> true,
-				CstCommon::STATUS		=> CstCommon::SUCCESS,
-				CstRequest::MESSAGE	=> $this->l10nRcdevsSettingsService->t('The cron job has been activated at %s', [date('Y-m-d_H:i:s')]),
+				CstReturn::CODE		=> 1,
+				CstCommon::STATUS	=> CstCommon::SUCCESS,
+				CstReturn::MESSAGE	=> $this->l10nRcdevsSettingsService->t('The cron job has been activated at %s', [date('Y-m-d_H:i:s')]),
 			];
 		} catch (\Throwable $th) {
 			$return = [
-				CstRequest::CODE	=> false,
+				CstReturn::CODE		=> 0,
 				CstCommon::STATUS	=> CstCommon::ERROR,
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 

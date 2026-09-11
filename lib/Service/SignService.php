@@ -21,36 +21,47 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Service;
 
 // RCDevs Bundle
-use \OCA\RCDevs\Entity\CurlEntity;
-use \OCA\RCDevs\Entity\NotificationEntity;
-use \OCA\RCDevs\Entity\UserEntity;
-use \OCA\RCDevs\Entity\UsersListEntity;
-use \OCA\RCDevs\Service\FileService;
-use \OCA\RCDevs\Utility\Helpers;
-use \OCA\RCDevs\Utility\LogRCDevs;
-use \OCA\RCDevs\Utility\Notification;
-use \OCA\RCDevs\Utility\RequestResponse;
-use \OCA\RCDevs\Utility\SignatureType;
-// YumiSign Specif
-use \OCA\YumiSignNxtC\Db\SignSession;
-use \OCA\YumiSignNxtC\Db\SignSessionMapper;
-use \OCA\YumiSignNxtC\Service\CurlService;
-use \OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
-use \OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
-use \OCA\YumiSignNxtC\Utility\Constantes\CstException;
-use \OCA\YumiSignNxtC\Utility\Constantes\CstFile;
-use \OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
-use \OCA\YumiSignNxtC\Utility\Constantes\CstStatus;
+use OCA\YumiSignNxtC\RCDevs\Dto\CDEM;
+use OCA\YumiSignNxtC\RCDevs\Entity\CurlEntity;
+use OCA\YumiSignNxtC\RCDevs\Entity\NotificationEntity;
+use OCA\YumiSignNxtC\RCDevs\Entity\UserEntity;
+use OCA\YumiSignNxtC\RCDevs\Entity\UsersListEntity;
+use OCA\YumiSignNxtC\RCDevs\Exception\IgnoreIdException;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\Helpers;
+use OCA\YumiSignNxtC\RCDevs\Utility\Notification;
+use OCA\YumiSignNxtC\RCDevs\Utility\RequestResponse;
+use OCA\YumiSignNxtC\RCDevs\Utility\SignatureType;
+use OCA\YumiSignNxtC\Constant\CstApplication;
+use OCA\YumiSignNxtC\Constant\CstCommon;
+use OCA\YumiSignNxtC\Constant\CstDate;
+use OCA\YumiSignNxtC\Constant\CstEntity;
+use OCA\YumiSignNxtC\Constant\CstException;
+use OCA\YumiSignNxtC\Constant\CstFile;
+use OCA\YumiSignNxtC\Constant\CstLogMessages;
+use OCA\YumiSignNxtC\Constant\CstRequest;
+use OCA\YumiSignNxtC\Constant\CstReturn;
+use OCA\YumiSignNxtC\Constant\CstStatus;
+use OCA\YumiSignNxtC\Db\SignSession;
+use OCA\YumiSignNxtC\Db\TransactionMapper;
+use OCA\YumiSignNxtC\Service\CurlService;
+
 // Nextcloud Core
 use DateTime;
 use Exception;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\Files\IRootFolder;
-use OCP\FilesMetadata\IFilesMetadataManager;
+use OCP\IAppConfig;
 use OCP\IConfig;
+use OCP\Config\IUserConfig;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstSignedFolder;
+use OCA\YumiSignNxtC\RCDevs\Service\SignedFolderService;
+use OCA\YumiSignNxtC\RCDevs\Service\SignedDocumentService;
 use OCP\IDateTimeFormatter;
 use OCP\IL10N;
 use OCP\IRequest;
@@ -59,11 +70,13 @@ use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\L10N\IFactory;
 use OCP\Notification\IManager as INotificationManager;
-use OCP\Notification\IManager;
 
 class SignService
 {
 	const CNX_TIME_OUT = 3;
+	private const UI_REFRESH_SCOPE_ALL = 'all';
+	private const UI_REFRESH_SCOPE_FILES = 'files';
+	private const UI_REFRESH_SCOPE_TRANSACTIONS = 'transactions';
 
 	// Settings
 	private int			$asyncTimeout;
@@ -72,29 +85,31 @@ class SignService
 	private UserEntity	$applicant;
 
 	public function __construct(
-		private		ConfigurationService	$configurationService,
-		private		CurlService				$curlService,
-		private		IConfig					$config,
-		private		IDateTimeFormatter		$formatter,
-		private		IFactory				$l10nFactory,
-		private		IFilesMetadataManager	$filesMetadataManager,
-		private		IL10N					$l,
-		private		IL10N					$l10n,
-		private		IRootFolder				$rootFolder,
-		private		IURLGenerator 			$urlGenerator,
-		private		IUserManager			$userManager,
-		private		IUserSession			$userSession,
-		private		LogRCDevs				$logRCDevs,
-		private		Notification			$notification,
-		private		SignSessionMapper		$mapper,
-		private		TokenService			$tokenService,
-		protected	INotificationManager	$notificationManager,
-		protected	IURLGenerator			$url,
-		string|null							$UserId,
-
+		private ConfigurationService $configurationService,
+		private CurlService $curlService,
+		private IAppConfig $appConfig,
+		private IConfig $config,
+		private IDateTimeFormatter $formatter,
+		private IFactory $l10nFactory,
+		private IL10N $l,
+		private IL10N $l10n,
+		private IRootFolder $rootFolder,
+		private IURLGenerator $urlGenerator,
+		private IUserManager $userManager,
+		private IUserSession $userSession,
+		private LogRCDevs $logRCDevs,
+		private Notification $notification,
+		private TransactionMapper $mapper,
+		private TokenService $tokenService,
+		protected INotificationManager $notificationManager,
+		protected IURLGenerator $url,
+		string|null $UserId,
+		private IUserConfig $userConfig,
+		private SignedFolderService $signedFolders,
+		private SignedDocumentService $signedDocuments,
 	) {
-		$this->asyncTimeout	= (int) $this->config->getAppValue($this->configurationService->getAppId(), 'async_timeout'); // in days
-		$this->workspaceId	= intval($this->config->getAppValue($this->configurationService->getAppId(), 'workspace_id'));
+		$this->asyncTimeout	= $this->appConfig->getValueInt($this->configurationService->getAppId(), 'async_timeout'); // in days
+		$this->workspaceId	= (int) $this->configurationService->getWorkspaceId();
 		$this->url			= $urlGenerator;
 		$this->userId		= $UserId;
 
@@ -122,14 +137,13 @@ class SignService
 			$_credentialKey = "{$this->configurationService->getTokenName()} {$accessToken}";
 		}
 
-		$this->curlService = new CurlService($this->config, $this->logRCDevs);
+		$this->curlService = new CurlService($this->appConfig, $this->logRCDevs);
 		$this->curlService->addCredentialKey($_credentialKey);
 	}
 
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
 	private function addPreferences(
 		int $workflowId,
 		array $preferences
@@ -165,9 +179,9 @@ class SignService
 	}
 
 	private function addSteps(
-		int				$workflowId,
-		CurlEntity		$curlRecipients,
-		SignatureType	$signatureType,
+		int $workflowId,
+		CurlEntity $curlRecipients,
+		SignatureType $signatureType
 	): CurlEntity {
 		$curlResponse = new CurlEntity();
 		try {
@@ -228,16 +242,16 @@ class SignService
 			case $subArray && !(array_key_exists(CstRequest::IDENTIFIER, $response) &&
 				array_key_exists(CstRequest::RESULT, $response) &&
 				array_key_exists(CstRequest::RESPONSE, $response) &&
-				array_key_exists(CstRequest::ERROR, $response)
+				array_key_exists(CstReturn::ERROR, $response)
 			):
 				// Throw an exception because the YumiSign response structure is abnormal
-				throw new Exception($this->l->t("YumiSign response is invalid; process: \"{$processPrefix}\""), false);
+				throw new Exception($this->l->t("YumiSign response is invalid; process: \"{$processPrefix}\""));
 				break;
 
 			case !$subArray && !(array_key_exists(CstRequest::IDENTIFIER, $response) &&
 				array_key_exists(CstRequest::RESULT, $response) &&
 				array_key_exists(CstRequest::RESPONSE, $response) &&
-				array_key_exists(CstRequest::ERROR, $response)
+				array_key_exists(CstReturn::ERROR, $response)
 			):
 				// Multidimensional array
 				foreach ($response as $key => $item) {
@@ -248,29 +262,42 @@ class SignService
 			case (array_key_exists(CstRequest::IDENTIFIER, $response) &&
 				array_key_exists(CstRequest::RESULT, $response) &&
 				array_key_exists(CstRequest::RESPONSE, $response) &&
-				array_key_exists(CstRequest::ERROR, $response)):
+				array_key_exists(CstReturn::ERROR, $response)):
 				/**
 				 *	Simple array
 				 *	YumiSign returns error or bad result
 				 *	WARNING: this is not an exception but a Business Logic valid response
 				 */
-				if ($response[CstRequest::ERROR]	== true) {
-					$return[CstRequest::CODE]		= $response[CstRequest::ERROR][CstRequest::CODE];
-					$return[CstRequest::MESSAGE]	= $response[CstRequest::ERROR][CstRequest::MESSAGE];
+				if ($response[CstReturn::ERROR]	== true) {
+					$return[CstReturn::CODE]		= 1;
+					$return[CstReturn::DATA]		= [
+						'api' => $response,
+					];
+					$return[CstReturn::ERROR]		= $response[CstReturn::ERROR][CstReturn::CODE] ?? 1;
+					$return[CstReturn::MESSAGE]	= $response[CstReturn::ERROR][CstReturn::MESSAGE] ?? 'YumiSign API error';
 					break;
 				}
 				// Just in case error intel not filled and result is wrong...
 				if ($response[CstRequest::RESULT]	== false) {
-					$return[CstRequest::CODE]		= false;
-					$return[CstRequest::MESSAGE]	= "Error occurred during process";
+					$return[CstReturn::CODE]		= 1;
+					$return[CstReturn::DATA]		= [
+						'api' => $response,
+					];
+					$return[CstReturn::ERROR]		= 1;
+					$return[CstReturn::MESSAGE]	= "Error occurred during process";
+					break;
 				}
 				// Here, the response is OK
-				$return[CstRequest::CODE]		= true;
-				$return[CstRequest::MESSAGE]	= "OK";
+				$return[CstReturn::CODE]		= 0;
+				$return[CstReturn::DATA]		= [
+					'api' => $response,
+				];
+				$return[CstReturn::ERROR]		= null;
+				$return[CstReturn::MESSAGE]	= "OK";
 				break;
 
 			default:
-				throw new Exception($this->l->t("Function not implemented: you should contact RCDevs at netadm@rcdevs.com; process: \"{$processPrefix}\""), false);
+				throw new Exception($this->l->t("Function not implemented: you should contact RCDevs at netadm@rcdevs.com; process: \"{$processPrefix}\""));
 				break;
 		}
 
@@ -278,20 +305,34 @@ class SignService
 	}
 
 	private function commonSign(
-		UserEntity		$applicant,
-		UsersListEntity	$recipientsList,
-		string			$path,
-		int				$fileId,
-		SignatureType	$signatureType,
-	): array {
-		$returned = [];
+		UserEntity $applicant,
+		UsersListEntity $recipientsList,
+		string $path,
+		int $fileId,
+		SignatureType $signatureType
+	): CDEM {
+		$cdem = new CDEM();
 
 		try {
 			$this->logRCDevs->info(vsprintf('Common Signature for file #%s: [%s]', [$fileId, json_encode($path)]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
-			$fileToSign = new FileService($this->configurationService, $this->filesMetadataManager, $this->logRCDevs, $applicant, $fileId);
+			$this->signedFolders->validate((string) $applicant->getId());
+			foreach ($recipientsList->list as $recipient) {
+				$uid = (string) $recipient->getId();
+				if ($uid !== '' && $this->userManager->userExists($uid)) {
+					$this->signedFolders->validate($uid);
+				}
+			}
+
+			$fileToSign = new FileService(
+				configurationService: $this->configurationService,
+				logRCDevs: $this->logRCDevs,
+				user: $applicant,
+				id: $fileId
+			);
 
 			// Create a workflow
+			$this->logRCDevs->debug('Create a workflow', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$expiryDate = strtotime("+{$this->asyncTimeout} days");
 			$curlWorkflow = $this->createWorkflow(
 				$applicant->getDisplayName(),
@@ -302,6 +343,7 @@ class SignService
 			$workflow = json_decode($curlWorkflow->getBody(), associative: false);
 
 			// Add workflow preferences
+			$this->logRCDevs->debug('Add workflow preferences', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$appUrl = $this->urlGenerator->getBaseUrl();
 			$curlWorkflowPreferences = $this->addPreferences(
 				$workflow->id,
@@ -311,21 +353,26 @@ class SignService
 			);
 
 			// Retrieve the secret from YumiSign
+			$this->logRCDevs->debug('Retrieve the secret from YumiSign', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$secret = $this->getYumiSignSecret($curlWorkflowPreferences);
 
 			// Just for debug
+			$this->logRCDevs->debug('Just for debug', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$webhook = $curlWorkflowPreferences->getBody();
 			$this->logRCDevs->debug(sprintf('WEBHOOK : [%s]', $webhook),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			// Add recipients and retrieve roles
+			$this->logRCDevs->debug('Add recipients and retrieve roles', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$recipientsData = $this->getRecipients($recipientsList);
 			$curlRecipients = $this->addRecipients($workflow->id, $recipientsData['emails']);
 
 			// Retrieve Workflow values and insert data in DB
+			$this->logRCDevs->debug('Retrieve Workflow values and insert data in DB', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$curlDebriefWorkflow = $this->debriefWorkflow($workflow->id);
 			$debriefWorkflow = json_decode($curlDebriefWorkflow->getBody());
 
 			// Save data in DB for each recipient
+			$this->logRCDevs->debug('Save data in DB for each recipient', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			foreach ($debriefWorkflow->recipients as $dbwRecipients) {
 				// Insert row in DB
 				$signSession = new SignSession();
@@ -354,6 +401,7 @@ class SignService
 			}
 
 			// Add steps
+			$this->logRCDevs->debug('Add steps', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$curlSteps = $this->addSteps($workflow->id, $curlRecipients, $signatureType);
 			if (Helpers::isIssueResponse($curlSteps)) {
 				$this->logRCDevs->error(json_encode($curlSteps));
@@ -361,6 +409,7 @@ class SignService
 			}
 
 			// Add fields
+			$this->logRCDevs->debug('Add fields', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
 			$curlSession = $this->getSession($workflow->id);
 			$session = json_decode($curlSession->getBody(), associative: false);
 
@@ -370,37 +419,51 @@ class SignService
 			}
 
 			// Prepare YMS Designer
-			if (!empty($session->session) && !empty($session->designerUrl)) {
-				$resp = array_merge(
-					json_decode(json_encode($session), true),
-					[
-						CstRequest::CODE		=> 2,
-						CstRequest::DATA		=> null,
-						CstRequest::ERROR		=> null,
-						CstRequest::MESSAGE		=> CstRequest::OPENDESIGNER,
-						CstRequest::WORKSPACEID	=> $this->workspaceId,
-						CstRequest::WORKFLOWID	=> $workflow->id,
-						CstRequest::ENVELOPEID	=> $workflow->envelopeId,
-					],
-				);
+				$this->logRCDevs->debug('Prepare YMS Designer', $this->logRCDevs->format(exceptionFunction: __FUNCTION__, exceptionClass: __CLASS__, exceptionFile: __FILE__, exceptionLine: __LINE__));
+				if (!empty($session->session) && !empty($session->designerUrl)) {
+					$response = new RequestResponse(json_decode(json_encode($session), true));
+					$cdem->fromArray([
+						CstReturn::CODE		=> 0,
+						CstReturn::DATA		=> [
+							CstReturn::CODE			=> 2,
+							CstRequest::WORKSPACEID	=> $this->workspaceId,
+							CstRequest::WORKFLOWID	=> $workflow->id,
+							CstRequest::ENVELOPEID	=> $workflow->envelopeId,
+							CstRequest::RESPONSE	=> $response,
+							'api'					=> [
+								'createWorkflow'			=> json_decode((string) $curlWorkflow->getBody(), true),
+								'addPreferences'			=> json_decode((string) $curlWorkflowPreferences->getBody(), true),
+								'addRecipients'				=> json_decode((string) $curlRecipients->getBody(), true),
+								'debriefWorkflow'			=> json_decode((string) $curlDebriefWorkflow->getBody(), true),
+								'addSteps'					=> json_decode((string) $curlSteps->getBody(), true),
+								'getSession'				=> json_decode((string) $curlSession->getBody(), true),
+								'createWorkflowHttpCode'	=> $curlWorkflow->getCode(),
+								'addPreferencesHttpCode'	=> $curlWorkflowPreferences->getCode(),
+								'addRecipientsHttpCode'		=> $curlRecipients->getCode(),
+								'debriefWorkflowHttpCode'	=> $curlDebriefWorkflow->getCode(),
+								'addStepsHttpCode'			=> $curlSteps->getCode(),
+								'getSessionHttpCode'		=> $curlSession->getCode(),
+							],
+						],
+						CstReturn::ERROR	=> null,
+						CstReturn::MESSAGE	=> CstRequest::OPENDESIGNER,
+					]);
 			} else {
 				$this->logRCDevs->error(sprintf("Critical error before running YumiSign Designer. Session value is \"%s\"", json_encode($session)), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 				throw new Exception(CstException::INTERNAL_SERVER_ERROR, 1);
 			}
+			} catch (\Throwable $th) {
+				$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
-			$returned = $resp;
-		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-
-			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
-			];
+				$cdem->fromArray([
+					CstReturn::CODE		=> 1,
+					CstReturn::DATA		=> null,
+					CstReturn::ERROR	=> $th->getCode(),
+					CstReturn::MESSAGE	=> $th->getMessage(),
+			]);
 		}
 
-		return $returned;
+		return $cdem;
 	}
 
 	private function createWorkflow(
@@ -478,7 +541,7 @@ class SignService
 				}
 			}
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw new Exception(CstException::RECIPIENTS_EMAILS, 0);
 		}
 
@@ -513,7 +576,7 @@ class SignService
 			}
 			if (empty($return)) throw new Exception(CstException::NO_SECRET_PARAMETER, 0);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
 		}
 
@@ -523,6 +586,62 @@ class SignService
 	private function randomColorPart()
 	{
 		return str_pad(dechex(mt_rand(128, 230)), 2, '0', STR_PAD_LEFT);
+	}
+
+	private function normalizeUiRefreshScope(
+		string $scope
+	): string {
+		$scope = strtolower(trim($scope));
+		switch ($scope) {
+			case self::UI_REFRESH_SCOPE_FILES:
+			case self::UI_REFRESH_SCOPE_TRANSACTIONS:
+			case self::UI_REFRESH_SCOPE_ALL:
+				return $scope;
+			default:
+				return self::UI_REFRESH_SCOPE_ALL;
+		}
+	}
+
+	private function markUiRefreshForApplicant(
+		?string $applicantId,
+		string $scope = self::UI_REFRESH_SCOPE_ALL
+	): void {
+		$applicantId = is_null($applicantId) ? '' : trim($applicantId);
+		if ($applicantId === '') {
+			return;
+		}
+		$scope = $this->normalizeUiRefreshScope($scope);
+
+		$this->userConfig->setValueString(
+			$applicantId,
+			$this->configurationService->getAppId(),
+			'ui_refresh_token',
+			(string) microtime(true),
+		);
+
+		$this->userConfig->setValueString(
+			$applicantId,
+			$this->configurationService->getAppId(),
+			'ui_refresh_scope',
+			$scope,
+		);
+	}
+
+	private function markUiRefreshForApplicants(
+		array $applicantIds,
+		string $scope = self::UI_REFRESH_SCOPE_ALL
+	): void {
+		$uniqueApplicantIds = [];
+		foreach ($applicantIds as $applicantId) {
+			$candidate = trim((string) $applicantId);
+			if ($candidate !== '') {
+				$uniqueApplicantIds[$candidate] = true;
+			}
+		}
+
+		foreach (array_keys($uniqueApplicantIds) as $applicantId) {
+			$this->markUiRefreshForApplicant($applicantId, $scope);
+		}
 	}
 
 	private function retrieveEnvelopesIds(
@@ -551,8 +670,8 @@ class SignService
 				->setDateTime(new \DateTime())
 				->setObject($notificationEntity->idName, $notificationEntity->id)
 				->setSubject($this->configurationService->getApplicationName(), [
-					CstRequest::CODE	=> true,
-					CstRequest::MESSAGE	=> $notificationEntity->message,
+					CstReturn::CODE	=> true,
+					CstReturn::MESSAGE	=> $notificationEntity->message,
 					CstRequest::STATUS	=> $notificationEntity->status,
 				])
 				->setIcon($this->url->getAbsoluteURL($this->url->imagePath($this->configurationService->getAppId(), 'app-dark.svg')))
@@ -566,7 +685,7 @@ class SignService
 				}
 			}
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
 		}
 	}
@@ -587,7 +706,6 @@ class SignService
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
-
 	public function cancelWorkflow(
 		int $workflowId
 	): array {
@@ -687,7 +805,7 @@ class SignService
 			}
 		} catch (\Throwable $th) {
 			$curlResponse = new CurlEntity();
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 		}
 		$this->logRCDevs->info("checkAsyncSignature : well done", __FUNCTION__);
 
@@ -698,10 +816,23 @@ class SignService
 		string $applicantId = null
 	) {
 		try {
+			// Recover downloads independently of the transaction's expiry date.
+			foreach ($this->signedDocuments->pendingSources() as $pending) {
+				$retried = $this->saveTransactionFiles($pending['source'], '', __FUNCTION__);
+				if (($retried[CstRequest::SAVED] ?? false) === true) {
+					$this->updateAllStatus($pending['reference'], CstStatus::SIGNED);
+				}
+			}
+			// Retry retained provider results even when their original transaction has expired.
+			foreach ($this->signedDocuments->retryPending() as $reference) {
+				$this->updateAllStatus($reference, CstStatus::SIGNED);
+			}
+
 			$this->logRCDevs->debug("########################################################################", __FUNCTION__);
 
 			$envelopesIds = [];
 			$transactionsToUpdate = [];
+			$applicantsToRefresh = [];
 			$rightNow = intval(time());
 
 			// Update expired transactions status and global status
@@ -709,11 +840,11 @@ class SignService
 
 			// Count actives transactions
 			$countTransactions = $this->mapper->countTransactions($rightNow, $applicantId);
-			if ($countTransactions[CstRequest::CODE] != 1) {
+			if ($countTransactions[CstReturn::CODE] != 1) {
 				throw new Exception($countTransactions[CstCommon::ERROR], 1);
 			}
 			// Just to have a clearer code ...
-			$countTransactions = $countTransactions[CstRequest::DATA];
+			$countTransactions = $countTransactions[CstReturn::DATA];
 
 			$realTransactionProcessed = 0;
 
@@ -745,17 +876,17 @@ class SignService
 
 				// Check if return request is without error
 				$apiKeyRateLimitReached = false;
-				if (array_key_exists(CstRequest::ERROR, $requestBody) && !is_null($requestBody[CstRequest::ERROR])) {
-					$apiKeyRateLimitReached = ($requestBody[CstRequest::ERROR][CstRequest::CODE] === 'API_KEY_RATE_LIMIT_REACHED');
-					$this->logRCDevs->error(sprintf("Something happened during YumiSign server calls; server sent this message: %s", $requestBody[CstRequest::ERROR][CstRequest::MESSAGE]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+				if (array_key_exists(CstReturn::ERROR, $requestBody) && !is_null($requestBody[CstReturn::ERROR])) {
+					$apiKeyRateLimitReached = ($requestBody[CstReturn::ERROR][CstReturn::CODE] === 'API_KEY_RATE_LIMIT_REACHED');
+					$this->logRCDevs->error(sprintf("Something happened during YumiSign server calls; server sent this message: %s", $requestBody[CstReturn::ERROR][CstReturn::MESSAGE]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 				} else {
 					// Prepare to update transations from retrieved data
 					foreach ($requestBody as $actualTransaction) {
 
 						switch (true) {
 							// Ban transactions which are invalid
-							case array_key_exists(CstRequest::ERROR, $actualTransaction) && !is_null($actualTransaction[CstRequest::ERROR]):
-								switch ($actualTransaction[CstRequest::ERROR][CstRequest::CODE]) {
+							case array_key_exists(CstReturn::ERROR, $actualTransaction) && !is_null($actualTransaction[CstReturn::ERROR]):
+								switch ($actualTransaction[CstReturn::ERROR][CstReturn::CODE]) {
 									case CstException::ENVELOPE_NOT_FOUND:
 										$transactionsToUpdate[] = [
 											CstEntity::ENVELOPE_ID	=> $actualTransaction[CstRequest::IDENTIFIER],
@@ -763,6 +894,7 @@ class SignService
 											CstEntity::STATUS	 => CstStatus::NOT_FOUND,
 											CstEntity::GLOBAL_STATUS => CstStatus::NOT_FOUND,
 										];
+										$applicantsToRefresh[] = $envelopesIds[$actualTransaction[CstRequest::IDENTIFIER]][CstEntity::APPLICANT_ID] ?? $applicantId;
 										break;
 
 									default: // Set generic status
@@ -772,16 +904,17 @@ class SignService
 											CstEntity::STATUS	 => CstStatus::NOT_APPLICABLE,
 											CstEntity::GLOBAL_STATUS => CstStatus::NOT_APPLICABLE,
 										];
+										$applicantsToRefresh[] = $envelopesIds[$actualTransaction[CstRequest::IDENTIFIER]][CstEntity::APPLICANT_ID] ?? $applicantId;
 										break;
 								}
 								break;
 							// Manage transactions which are valid
-							case array_key_exists(CstRequest::ERROR, $actualTransaction) && is_null($actualTransaction[CstRequest::ERROR]):
+							case array_key_exists(CstReturn::ERROR, $actualTransaction) && is_null($actualTransaction[CstReturn::ERROR]):
 								// Flag which indicated if we insert the array $currentTransaction after foreach loops
 								$isCurrentTransactionInserted = false;
 								$currentTransaction = [
 									CstEntity::ENVELOPE_ID		=> $actualTransaction[CstRequest::IDENTIFIER],
-									CstEntity::APPLICANT_ID		=> $applicantId,
+									CstEntity::APPLICANT_ID		=> $envelopesIds[$actualTransaction[CstRequest::RESPONSE][CstRequest::ID]][CstEntity::APPLICANT_ID] ?? $applicantId,
 									CstEntity::GLOBAL_STATUS	=> $actualTransaction[CstRequest::RESPONSE][CstCommon::STATUS],
 								];
 
@@ -794,7 +927,7 @@ class SignService
 									);
 
 									// Change status if file is saved: prevent to lose records in DB
-									if (Helpers::isValidResponse($resp)) {
+									if (($resp[CstRequest::SAVED] ?? false) === true) {
 										// Check status for all recipients (will run if not signed)
 										foreach ($actualTransaction[CstRequest::RESPONSE][CstRequest::STEPS] as $key => $step) {
 											foreach ($step[CstRequest::ACTIONS] as $key => $action) {
@@ -803,15 +936,18 @@ class SignService
 												$currentTransaction[CstEntity::STATUS]		= $action[CstRequest::STATUS];
 												$transactionsToUpdate[]						= $currentTransaction; // We insert directly the current transaction inside the global array
 												$isCurrentTransactionInserted				= true;
+												$applicantsToRefresh[] = $currentTransaction[CstEntity::APPLICANT_ID] ?? '';
 											}
 										}
 									} else {
-										$currentTransaction[CstEntity::GLOBAL_STATUS] = CstRequest::ERROR;
+										// Keep this workflow eligible for another retrieval; do not mark saving as completed.
+										break;
 									}
 								}
 
 								if (!$isCurrentTransactionInserted) {
 									$transactionsToUpdate[] = $currentTransaction;
+									$applicantsToRefresh[] = $currentTransaction[CstEntity::APPLICANT_ID] ?? '';
 								}
 								break;
 
@@ -840,7 +976,10 @@ class SignService
 			$startUpdatedata = new DateTime();
 			$this->logRCDevs->debug(sprintf("Start update process at %s", date_format($startUpdatedata, "Y/m/d H:i:s")), __FUNCTION__);
 
-			$realTransactionUpdated = $this->mapper->updateTransactionsStatus($transactionsToUpdate);
+				$realTransactionUpdated = $this->mapper->updateTransactionsStatus($transactionsToUpdate);
+				if ($realTransactionUpdated > 0) {
+					$this->markUiRefreshForApplicants($applicantsToRefresh, self::UI_REFRESH_SCOPE_ALL);
+				}
 			$endUpdatedata = new DateTime();
 
 			$sinceStart = $startUpdatedata->diff($endUpdatedata);
@@ -865,8 +1004,15 @@ class SignService
 		if (($curlResponse->getCode() !== 200) && ($curlResponse->getCode() !== 302)) {
 			$message = sprintf("cURL returned unwanted code (%s). This process is skipped for function %s.", $curlResponse->getCode(), $functionName);
 			$this->logRCDevs->debug($message, __FUNCTION__);
-			$return[CstRequest::CODE] = false;
-			$return[CstRequest::MESSAGE] = $message;
+			$return[CstReturn::CODE] = 1;
+			$return[CstReturn::DATA] = [
+				'api' => [
+					'httpCode' => $curlResponse->getCode(),
+					'response' => $curlResponse->getBody(),
+				],
+			];
+			$return[CstReturn::ERROR] = $curlResponse->getCode();
+			$return[CstReturn::MESSAGE] = $message;
 			return $return;
 		}
 
@@ -918,8 +1064,8 @@ class SignService
 	) {
 		$owner = $this->userManager->get($userId);
 		$lang = 'en';
-		$timeZone = $this->config->getUserValue($owner->getUID(), 'core', 'timezone', null);
-		$timeZone = isset($timeZone) ? new \DateTimeZone($timeZone) : new \DateTimeZone('UTC');
+		$timeZone = $this->config->getUserValue($owner->getUID(), CstApplication::CORE, CstDate::TIMEZONE, null);
+		$timeZone = isset($timeZone) ? new \DateTimeZone($timeZone) : new \DateTimeZone(CstDate::UTC);
 
 		if ($lang) {
 			$l10n = $this->l10nFactory->get($this->configurationService->getAppId(), $lang);
@@ -938,212 +1084,134 @@ class SignService
 		string $userId,
 		string $fromFunction
 	): array {
-		$created = null;
-		$envelopeId = '';
-
 		try {
-			$threadId = bin2hex(random_bytes(8));
-			$this->logRCDevs->info("Saving transaction files for user [{$userId}] / Sent from fct [{$fromFunction}]", __FUNCTION__);
-			$warningMsg = '';
-
-			// Get current document full path (filesystem)
-			if (is_null($this->applicant->getId())) {
-				$this->applicant = new UserEntity(
-					$this->config,
-					$this->rootFolder,
-					$this->userManager,
-					id: $userId,
-					emailAddress: null,
-				);
-			};
-
-			if (array_key_exists('documents', $requestBody)) {
-				foreach ($requestBody['documents'] as $key => $document) {
-					$this->logRCDevs->debug(sprintf('Foreach Doc [%s]', json_encode($document)), __FUNCTION__);
-
-					if (array_key_exists('file', $document) && array_key_exists('file', $document['file'])) {
-						$envelopeId = Helpers::getArrayData($requestBody, 'id', true, 'YumiSign transaction ID field is missing');
-						$this->logRCDevs->debug(sprintf('EnvelopeId [%s]', $envelopeId), __FUNCTION__);
-
-						try {
-							// If the envelope Id exists,  update it with this Thread Id as Mutex
-							$this->mapper->updateTransactionsMutex($threadId, $envelopeId, CstEntity::ENVELOPE_ID);
-							// Get the envelope Id and check if the Mutex === thread Id; if OK, this thread will save the file
-							$yumisignSession = $this->mapper->findTransaction($envelopeId, CstEntity::ENVELOPE_ID);
-						} catch (DoesNotExistException $e) {
-							$warningMsg = "YumiSign transaction {$envelopeId} not found";
-							$this->logRCDevs->info($warningMsg, __FUNCTION__);
-							return [
-								CstRequest::CODE		=> 0,
-								CstRequest::ERROR		=> Helpers::warning($warningMsg),
-								CstRequest::FILENODE	=> null,
-								CstRequest::SAVED		=> false,
-							];
-						}
-
-						// If Mutex is not empty and not equal to Thread Id, it means another process handles it
-						$this->logRCDevs->debug(sprintf('Thread is %s', $threadId), __FUNCTION__);
-						$this->logRCDevs->debug(sprintf('Mutex is %s', $yumisignSession->getMutex()), __FUNCTION__);
-						if (
-							$yumisignSession->getMutex() !== ''
-							&& !is_null($yumisignSession->getMutex())
-							&& $yumisignSession->getMutex() !== $threadId
-						) {
-							$this->logRCDevs->debug(sprintf('Ignore this EnvId',), __FUNCTION__);
-							return [
-								CstRequest::CODE		=> 1,
-								CstRequest::ERROR		=> 0,
-								CstRequest::FILENODE	=> null,
-								CstRequest::SAVED		=> false,
-							];
-						}
-
-						$this->logRCDevs->debug(sprintf('Save this EnvId',), __FUNCTION__);
-
-						/**
-						 *	Here, this Thread will handle the transaction file
-						 *	Only one session in the result
-						 */
-						if ($yumisignSession->getFileId())	$fileId	 = $yumisignSession->getFileId();
-
-						$url = str_replace('\\', '', $document['file']['file']);
-
-						$ymsUrlArchive = $this->configurationService->getUrlArchive();
-
-						$this->logRCDevs->debug($document['file']['file'], __FUNCTION__);
-						$this->logRCDevs->debug($url, __FUNCTION__);
-						$this->logRCDevs->debug($ymsUrlArchive, __FUNCTION__);
-
-						$this->logRCDevs->debug(substr(parse_url($url, PHP_URL_PATH), 0, strlen(parse_url($ymsUrlArchive, PHP_URL_PATH))), __FUNCTION__);
-						$this->logRCDevs->debug(parse_url($ymsUrlArchive, PHP_URL_PATH), __FUNCTION__);
-
-						if (
-							Helpers::areDifferent(
-								substr(parse_url($url, PHP_URL_PATH), 0, strlen(parse_url($ymsUrlArchive, PHP_URL_PATH))),
-								parse_url($ymsUrlArchive, PHP_URL_PATH)
-							)
-						) {
-							$this->logRCDevs->warning(
-								'EnvelopeID mismatch : ' .
-									parse_url(substr($url, 0, strlen($ymsUrlArchive))) .
-									' versus ' .
-									parse_url($ymsUrlArchive),
-								__FUNCTION__
-							);
-							$this->logRCDevs->warning($warningMsg, __FUNCTION__);
-							throw new Exception("This url does not match to the Archives", 1);
-						}
-
-						$temporaryFile = $this->curlService->getDocument($url)->getResponse();
-
-						/** @var File $createdFile */
-						$fileToSign = new FileService(
-							$this->configurationService,
-							$this->filesMetadataManager,
-							$this->logRCDevs,
-							$this->applicant,
-							$fileId,
-							toSeal: false
-						);
-						$createdFile = $fileToSign->create($temporaryFile, $this->configurationService->doyouOverwrite());
-
-						$data = [
-							CstEntity::FILE_ID		=> $createdFile->getId(),
-							CstEntity::NAME			=> ltrim($createdFile->getInternalPath(), 'files/'),
-							CstEntity::OVERWRITE	=> $this->configurationService->doyouOverwrite(),
-							CstFile::INTERNAL_PATH	=> $createdFile->getInternalPath(),
-							CstFile::PATH			=> $createdFile->getPath(),
-							CstFile::SIZE			=> $createdFile->getSize(),
-						];
-
-						$this->logRCDevs->debug(vsprintf('Returned data : [%s]', [json_encode($data)]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-
-						return [
-							CstRequest::CODE		=> 1,
-							CstRequest::ERROR		=> 0,
-							CstRequest::FILENODE	=> $created,
-							CstRequest::SAVED		=> true,
-						];
+			// A recipient's individual completion must never distribute an unfinished workflow.
+			if (strtolower((string) ($requestBody['status'] ?? '')) !== CstStatus::SIGNED) {
+				throw new Exception('The complete signature workflow must succeed before saving documents');
+			}
+			$envelopeId = (string) ($requestBody['id'] ?? '');
+			if ($envelopeId === '') {
+				throw new Exception('Missing signed workflow identifier');
+			}
+			if (!$this->signedDocuments->known($envelopeId)) {
+				$this->signedDocuments->rememberSource($envelopeId, $requestBody);
+				$session = $this->mapper->findTransaction($envelopeId, CstEntity::ENVELOPE_ID);
+				// Use the recorded owner, never the currently logged-in user or a source path at a recipient.
+				$owner = (string) $session->getApplicantId();
+				$participants = [$owner => [CstSignedFolder::APPLICANT]];
+				foreach ($this->mapper->findRecipientsIdsByTransaction($envelopeId, CstEntity::ENVELOPE_ID) as $recipient) {
+					$uid = (string) $recipient->getRecipientId();
+					if ($uid !== '' && $this->userManager->userExists($uid)) {
+						$participants[$uid][] = CstSignedFolder::RECIPIENT;
 					}
 				}
+				$documents = [];
+				foreach (($requestBody['documents'] ?? []) as $document) {
+					$url = (string) ($document['file']['file'] ?? '');
+					$archive = parse_url($this->configurationService->getUrlArchive());
+					$target = parse_url($url);
+					if (!$target || !$archive || !isset($target['host'], $archive['host'])
+						|| strtolower($target['host']) !== strtolower($archive['host'])
+						|| ($target['scheme'] ?? '') !== ($archive['scheme'] ?? '')
+						|| ($target['port'] ?? null) !== ($archive['port'] ?? null)
+						|| !str_starts_with($target['path'] ?? '', rtrim($archive['path'] ?? '', '/') . '/')) {
+						throw new Exception('Signed document URL does not match the configured archive');
+					}
+					$result = $this->curlService->getDocument($url);
+					$content = $result->getResponse();
+					if ($result->getCode() !== 200 || !is_string($content) || $content === '') {
+						throw new Exception('Cannot retrieve the final signed document; saving must be retried');
+					}
+					$sourceName = basename((string) ($document['name'] ?? $session->getFilePath()));
+					$extension = str_starts_with($content, '%PDF-') ? 'pdf' : (strtolower(pathinfo($sourceName, PATHINFO_EXTENSION)) === 'pdf' ? 'pdf' : 'p7s');
+					$complement = $this->configurationService->textualComplementSign() ?: $this->configurationService->getAppNameSigned();
+					$name = pathinfo($sourceName, PATHINFO_FILENAME) . '_' . $complement . '_' . gmdate('Y-m-d_H.i.s') . '.' . $extension;
+					$documents[] = ['name' => $name, 'content' => $content];
+				}
+				$this->signedDocuments->enqueue($envelopeId, $participants, $documents);
 			}
-		} catch (\Throwable $th) {
-			// Restore empty Mutex
-			$this->mapper->updateTransactionsMutexReset($threadId, $envelopeId, CstEntity::ENVELOPE_ID);
-
-			$envelopeId = $envelopeId === '' ? 'undefined' : $envelopeId;
-			$this->logRCDevs->error("Issue on envelopeId {$envelopeId}: {$th->getMessage()}", __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			return [
-				CstRequest::CODE		=> 0,
-				CstRequest::ERROR		=> $th->getCode(),
-				CstRequest::FILENODE	=> $created,
-				CstRequest::SAVED		=> false,
-			];
+			$this->signedDocuments->forgetSource($envelopeId);
+			$saved = $this->signedDocuments->deliver($envelopeId);
+			return [CstReturn::CODE => $saved ? 0 : 1, CstReturn::ERROR => $saved ? null : 'Signed document delivery pending', CstRequest::SAVED => $saved];
+		} catch (\Throwable $e) {
+			$this->logRCDevs->error('Signed document saving remains pending: ' . $e->getMessage(), __FUNCTION__);
+			return [CstReturn::CODE => 1, CstReturn::ERROR => $e->getMessage(), CstRequest::SAVED => false];
 		}
 	}
 
 	public function signLocalAsyncPrepare(
-		UserEntity		$applicant,
-		UsersListEntity	$recipientsList,
-		string			$path,
-		int				$fileId,
-		SignatureType	$signatureType,
-	): array {
-		$returned = [];
+		UserEntity $applicant,
+		UsersListEntity $recipientsList,
+		string $path,
+		int $fileId,
+		SignatureType $signatureType
+	): CDEM {
+		$cdem = new CDEM();
 
 		try {
 			$this->logRCDevs->debug(vsprintf('Prepare asynchronous Local Signature for file #%s (%s) in [%s] from [%s] to these recipients : %s', [$fileId, json_encode($path), $signatureType->get(), json_encode($applicant), json_encode($recipientsList)]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
-			$resp = new RequestResponse($this->commonSign(
-				$applicant,
-				$recipientsList,
-				$path,
+				$cdem = $this->commonSign(
+					$applicant,
+					$recipientsList,
+					$path,
 				$fileId,
 				$signatureType,
-			));
-			if ($resp->isFailed()) {
-				throw new Exception($resp[CstRequest::MESSAGE]);
+			);
+				if ($cdem->isFailed()) {
+					throw new Exception($cdem->message() ?? CstException::SIGN_PROCESS, $cdem->code());
+				}
+
+				/** @var array $response */
+				$response = $cdem->data();
+				if (!is_array($response) || Helpers::isIssueResponse($response)) {
+					throw new Exception($cdem->message() ?? CstException::SIGN_PROCESS, $cdem->code());
+				}
+
+			$message = sprintf(
+				'Transaction created for %s',
+				(count($recipientsList->list) > 1
+					? 'several recipients'
+					: $recipientsList->list[0]->getEmailAddress())
+			);
+
+				$cdem->fromArray([
+					CstReturn::CODE		=> 0,
+					CstReturn::DATA		=> $response,
+					CstReturn::ERROR	=> null,
+					CstReturn::MESSAGE	=> $message,
+				]);
+
+			$this->logRCDevs->debug(sprintf('signLocalAsyncPrepare returned: [%s]', json_encode($cdem)), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+				$cdem->fromArray([
+					CstReturn::CODE => 1,
+					CstReturn::DATA => null,
+					CstReturn::ERROR => $th->getCode(),
+					CstReturn::MESSAGE => $th->getMessage() ?: CstException::SIGN_PROCESS,
+				]);
 			}
 
-			$returned = [
-				CstRequest::CODE			=> $resp->getCode(),
-				CstRequest::DATA			=> null,
-				CstRequest::ERROR			=> null,
-				CstRequest::DESIGNERURL		=> Helpers::getArrayData($resp->getArray(), CstRequest::DESIGNERURL, false),
-				CstRequest::ENVELOPEID		=> Helpers::getArrayData($resp->getArray(), CstRequest::ENVELOPEID, false),
-				CstRequest::MESSAGE			=> sprintf(
-					'Transaction created for %s',
-					(count($recipientsList->list) > 1
-						? 'several recipients'
-						: $recipientsList->list[0]->getEmailAddress())
-				),
-				CstRequest::SESSION			=> Helpers::getArrayData($resp->getArray(), CstRequest::SESSION,	false),
-				CstRequest::WORKFLOWID		=> Helpers::getArrayData($resp->getArray(), CstRequest::WORKFLOWID, false),
-				CstRequest::WORKSPACEID		=> Helpers::getArrayData($resp->getArray(), CstRequest::WORKSPACEID, false),
-			];
-
-			$this->logRCDevs->debug(sprintf('signLocalAsyncPrepare returned: [%s]', json_encode($returned)), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-
-			$returned = [
-				CstRequest::CODE => 0,
-				CstRequest::DATA => null,
-				CstRequest::ERROR => $th->getCode(),
-				CstRequest::MESSAGE => $th->getMessage(),
-			];
-		}
-
-		return $returned;
+		return $cdem;
 	}
 
 	public function signLocalAsyncSubmit(
-		UserEntity	$applicant,
-		int			$workspaceId,
-		int			$workflowId,
-		string		$envelopeId
+		UserEntity $applicant,
+		int $workspaceId,
+		int $workflowId,
+		string $envelopeId
 	) {
 		$resp = [];
+
+		$this->signedFolders->validate((string) $applicant->getId());
+		foreach ($this->mapper->findRecipientsIdsByTransaction($envelopeId, CstEntity::ENVELOPE_ID) as $recipient) {
+			$uid = (string) $recipient->getRecipientId();
+			if ($uid !== '' && $this->userManager->userExists($uid)) {
+				$this->signedFolders->validate($uid);
+			}
+		}
 
 		// Start the workflow
 		$curlWorkflow = $this->startWorkflow($workflowId);
@@ -1153,16 +1221,16 @@ class SignService
 		$workflow = json_decode($curlWorkflow->getBody(), associative: true);
 
 		// Check the error
-		if (Helpers::getIfExists(CstRequest::ERROR, $workflow)) {
+		if (Helpers::getIfExists(CstReturn::ERROR, $workflow)) {
 			throw new Exception(
-				Helpers::getIfExists(CstRequest::MESSAGE, $workflow[CstRequest::ERROR]),
+				Helpers::getIfExists(CstReturn::MESSAGE, $workflow[CstReturn::ERROR]),
 				0,
 			);
 		}
 
 		if (!isset($workflow[0]->error) || !is_null($workflow[0]->error)) {
-			$resp[CstRequest::CODE] = (isset($workflow[0]->error->code) ? $workflow[0]->error->code : "");
-			$resp[CstRequest::MESSAGE] = (isset($workflow[0]->error->message) ? $workflow[0]->error->message : "");
+			$resp[CstReturn::CODE] = (isset($workflow[0]->error->code) ? $workflow[0]->error->code : "");
+			$resp[CstReturn::MESSAGE] = (isset($workflow[0]->error->message) ? $workflow[0]->error->message : "");
 
 			// The following are filled with "fake" data (this is just to be compliant with conditions in Vue file)
 			$resp[CstRequest::SESSION] = (isset($workflow[0]->error->message) ? $workflow[0]->error->message : "OK");
@@ -1172,7 +1240,7 @@ class SignService
 		}
 
 		// if ($workflow[0]->error === null) {
-		if (is_null(Helpers::getIfExists(CstRequest::ERROR, $workflow[0], returnNull: true)) || is_null($workflow[0]->error)) {
+		if (is_null(Helpers::getIfExists(CstReturn::ERROR, $workflow[0], returnNull: true)) || is_null($workflow[0]->error)) {
 			// Update status in DB
 			$yumisignSessions = $this->mapper->findTransactions($envelopeId, CstEntity::ENVELOPE_ID);
 			foreach ($yumisignSessions as $yumisignSession) {
@@ -1180,6 +1248,7 @@ class SignService
 				$yumisignSession->setChangeStatus(time());
 				$this->mapper->update($yumisignSession);
 			}
+				$this->markUiRefreshForApplicant($applicant->getId(), self::UI_REFRESH_SCOPE_TRANSACTIONS);
 			// Prepare OK notification
 			$notificationCode		= true;
 			$notificationMessage	= 'YumiSign transaction {status}';
@@ -1218,30 +1287,36 @@ class SignService
 
 		// If no exception, send notifications to all recipients to keep them informed the transaction is created
 		if ($notificationCode) {
-			//* @var SignSession $signSession */
-			foreach ($this->mapper->findRecipientsIdsByTransaction($envelopeId, CstEntity::ENVELOPE_ID) as $key => $signSession) {
-				$userIds[] = $signSession->getRecipientId();
+			$firstRecipientId = '';
+			foreach ($this->mapper->findRecipientsIdsByTransaction($envelopeId, CstEntity::ENVELOPE_ID) as $signSession) {
+				$candidateId = trim((string) $signSession->getRecipientId());
+				if ($candidateId !== '') {
+					$firstRecipientId = $candidateId;
+					break;
+				}
 			}
-			$usersIdsList = new UsersListEntity(
-				$this->config,
-				$this->rootFolder,
-				$this->userManager,
-				userIds: $userIds,
-				emailAddresses: null,
-			);
-			$notificationEntity = new NotificationEntity(
-				code: $notificationCode,
-				id: $envelopeId,
-				idName: CstRequest::ENVELOPEID,
-				message: "You have been requested to sign a document",
-				status: $notificationStatus
-			);
 
-			// $this->notification->send(
-			$this->send(
-				$usersIdsList,
-				$notificationEntity,
-			);
+			if ($firstRecipientId !== '') {
+				$usersIdsList = new UsersListEntity(
+					$this->config,
+					$this->rootFolder,
+					$this->userManager,
+					userIds: [$firstRecipientId],
+					emailAddresses: null,
+				);
+				$notificationEntity = new NotificationEntity(
+					code: $notificationCode,
+					id: $envelopeId,
+					idName: CstRequest::ENVELOPEID,
+					message: "You have been requested to sign a document",
+					status: $notificationStatus
+				);
+
+				$this->send(
+					$usersIdsList,
+					$notificationEntity,
+				);
+			}
 		}
 		return $resp;
 	}
@@ -1257,7 +1332,7 @@ class SignService
 
 	public function updateAllStatus(
 		string $envelopeId,
-		string $status,
+		string $status
 	) {
 		$processPrefix = sprintf("%s/%s/%s", basename(__FILE__, '.php'), __FUNCTION__, "Update all YumiSign workflow status");
 
@@ -1265,6 +1340,7 @@ class SignService
 			$rightNow = intval(time());
 
 			$yumisignSessions = $this->mapper->findTransactions($envelopeId, CstEntity::ENVELOPE_ID);
+			$applicantsToRefresh = [];
 			foreach ($yumisignSessions as $yumisignSession) {
 				// Check if update is needed according to sent message date
 				if ($rightNow > $yumisignSession->getMsgDate()) {
@@ -1275,8 +1351,13 @@ class SignService
 
 					// Update
 					$this->mapper->update($yumisignSession);
+					$applicantsToRefresh[] = $yumisignSession->getApplicantId();
 				}
 			}
+				$refreshScope = (strtolower(trim($status)) === CstStatus::SIGNED)
+					? self::UI_REFRESH_SCOPE_ALL
+					: self::UI_REFRESH_SCOPE_TRANSACTIONS;
+				$this->markUiRefreshForApplicants($applicantsToRefresh, $refreshScope);
 		} catch (\Throwable $th) {
 			throw new Exception($this->l->t("Critical error during process : \"{$processPrefix}\" / message: \"" . $th->getMessage() . "\""), 1);
 		}
@@ -1286,7 +1367,7 @@ class SignService
 		string $envelopeId,
 		string $recipient,
 		string $globalStatus,
-		string $status,
+		string $status
 	) {
 		$processPrefix = sprintf("%s/%s/%s", basename(__FILE__, '.php'), __FUNCTION__, "Update YumiSign workflow status");
 
@@ -1310,7 +1391,18 @@ class SignService
 
 				// Update
 				$this->mapper->update($yumisignSession);
-			}
+
+				$normalizedStatus = strtolower(trim($status));
+				$normalizedGlobalStatus = strtolower(trim($globalStatus));
+				$refreshScope = (
+					$normalizedStatus === CstStatus::SIGNED
+					|| $normalizedGlobalStatus === CstStatus::SIGNED
+				)
+					? self::UI_REFRESH_SCOPE_ALL
+					: self::UI_REFRESH_SCOPE_TRANSACTIONS;
+
+				$this->markUiRefreshForApplicant($yumisignSession->getApplicantId(), $refreshScope);
+				}
 		} catch (\Throwable $th) {
 			$exceptionMsg = $this->l->t("Critical error during process : \"{$processPrefix}\" / message: \"" . $th->getMessage() . "\" / {$envelopeId} / {$recipient} / {$globalStatus} / {$status}");
 			$this->logRCDevs->error($exceptionMsg, __FUNCTION__, true);
@@ -1318,121 +1410,4 @@ class SignService
 		}
 	}
 
-	public function webhook(
-		$headerYumiSign,
-		$requestBody
-	) {
-		$processStatus = [];
-		$applicantId = "";
-		$envelopeId = '';
-
-		try {
-			// Get header data
-			if (empty($headerYumiSign)) {
-				$warningMsg = $this->l->t('YumiSign signature is missing');
-				$this->logRCDevs->warning($warningMsg, __FUNCTION__);
-				throw new Exception($warningMsg, 1);
-			}
-
-			$headerdata = explode(',', str_replace('=', ',', $headerYumiSign));
-
-			if (array_key_exists('_route', $requestBody)) unset($requestBody['_route']);
-
-			$envelopeId = Helpers::getArrayData($requestBody, 'id',	 true, 'YumiSign transaction ID field is missing');
-			$status	= Helpers::getArrayData($requestBody, 'status',	true, 'YumiSign transaction status field is missing');
-
-			$secret = "";
-
-			try {
-				$yumisignSession = $this->mapper->findTransaction($envelopeId, CstEntity::ENVELOPE_ID);
-			} catch (DoesNotExistException $e) {
-				$warningMsg = "YumiSign transaction {$envelopeId} not found";
-				$this->logRCDevs->warning($warningMsg, __FUNCTION__);
-				throw new Exception($warningMsg, 1);
-			}
-
-			if ($yumisignSession->getApplicantId()) $applicantId = $yumisignSession->getApplicantId();
-			if ($yumisignSession->getSecret()) $secret = $yumisignSession->getSecret();
-			else {
-				$warningMsg = "YumiSign transaction secret not found";
-				$this->logRCDevs->warning($warningMsg, __FUNCTION__);
-				throw new Exception($warningMsg, 1);
-			}
-
-			$payload = $headerdata[1] . "." . json_encode($requestBody);
-
-			// Check if Keys match
-			$match = (strcmp(hash_hmac('sha256', $payload, $secret), $headerdata[3]) === 0);
-
-			// KO if not match
-			if (!$match) {
-				$warningMsg = "YumiSign transaction bad key";
-				$this->logRCDevs->warning($warningMsg, __FUNCTION__);
-				throw new Exception($warningMsg, 1);
-			}
-
-			// Valid transaction, do what you need to do...
-			switch ($status) {
-				case CstStatus::NOT_STARTED:
-				case CstStatus::APPROVED:
-				case CstStatus::CANCELED:
-				case CstStatus::DECLINED:
-				case CstStatus::EXPIRED:
-				case CstStatus::TO_BE_ARCHIVED:
-				case CstStatus::STARTED:
-					// Update each recipient status
-					$steps = Helpers::getArrayData($requestBody, 'steps',	true, 'YumiSign transaction steps fields are missing');
-					foreach ($steps as $step) {
-						foreach ($step['actions'] as $action) {
-							$resp = $this->updateStatus($envelopeId, $action['recipientEmail'], $status, $action['status'], $headerdata[1]);
-						}
-					}
-					break;
-				case CstStatus::SIGNED:
-					/**
-					 *	Only transaction status is available; the recipients status are not written in this Signed transaction
-					 *	So all status are updated as Signed (recipients + global)
-					 *	Save the files of this transaction (all recipients have signed)
-					 */
-					$resp = $this->saveTransactionFiles($requestBody, $yumisignSession->getApplicantId(), __FUNCTION__);
-					// Change status if file is saved: prevent to lose records in DB
-					if ($resp['code'] === 1) {
-						$resp = $this->updateAllStatus($envelopeId, $status);
-					}
-					break;
-				default:
-					#code...
-					break;
-			}
-
-			$processStatus[CstRequest::CODE] = true;
-			$processStatus[CstRequest::MESSAGE] = 'YumiSign transaction {status}';
-			$processStatus[CstRequest::STATUS] = $status;
-		} catch (\Throwable $th) {
-			$warningMsg = "{$th->getMessage()} / Envelope ID : {$envelopeId}";
-			$this->logRCDevs->error($warningMsg, __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			$processStatus = Helpers::warning($warningMsg);
-		}
-
-		try {
-			/**
-			 *	Send notification to applicant whatever the YumiSign transaction status EXCEPT for status == NULL (This is the WebHook initialization)
-			 *	However, if there was an exception, keep display it
-			 */
-			$manager = \OC::$server->get(IManager::class);
-			$notification = $manager->createNotification();
-
-			if (!empty($applicantId)) {
-				$notification->setApp($this->configurationService->getAppId())
-					->setUser($applicantId)
-					->setDateTime(new \DateTime())
-				;
-
-				$manager->notify($notification);
-			}
-		} catch (\Throwable $th) {
-			$this->logRCDevs->error($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			return Helpers::warning($th->getMessage());
-		}
-	}
 }

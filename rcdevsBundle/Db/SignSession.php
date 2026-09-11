@@ -21,7 +21,9 @@
  *
  */
 
-namespace OCA\RCDevs\Db;
+declare(strict_types=1);
+
+namespace OCA\YumiSignNxtC\RCDevs\Db;
 
 use JsonSerializable;
 

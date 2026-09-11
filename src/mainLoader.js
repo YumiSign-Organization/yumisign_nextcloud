@@ -22,7 +22,7 @@
 import Vue from 'vue'
 // import VueObserveVisibility from 'vue-observe-visibility'
 import { Tooltip } from '@nextcloud/vue'
-import { FileAction, Permission, registerFileAction } from '@nextcloud/files'
+import { Permission, registerFileAction } from '@nextcloud/files'
 
 import '@nextcloud/dialogs/style.css'
 
@@ -30,7 +30,8 @@ import YumiSignNxtCModal from './views/YumiSignNxtCModal.vue'
 import Logo from '../img/YumiSign.svg?raw'
 import './styles/yumisignLoader.css'
 import {getT} from './javascript/utility.js';
-import {signAction} from './javascript/config.js';
+import {appName, signAction} from './javascript/config.js';
+import { startUiRefreshWatcher } from './javascript/uiRefreshWatcher.js'
 
 Vue.prototype.t = t
 Vue.prototype.n = n
@@ -65,11 +66,11 @@ appSign.$on('dialog:closed', () => {
 	appSign.$data.chosenFile = null
 })
 
-registerFileAction(new FileAction({
+registerFileAction({
 	id: `${appName}_sign`,
 	displayName: () => getT('Sign with YumiSign'),
 	iconSvgInline: () => Logo,
-	enabled: (files, view) => {
+	enabled: ({ nodes: files }) => {
 		return (files.length === 1
 			&& (
 				files[0].mime		=== 'application/pdf'															// pdf
@@ -83,7 +84,10 @@ registerFileAction(new FileAction({
 			)
 			&& (files[0].permissions & (Permission.READ | Permission.WRITE)) === (Permission.READ | Permission.WRITE))
 	},
-	exec: (file, view, dir) => {
+	exec: async ({ nodes: [file] }) => {
 		appSign.$emit('dialog:open', file)
+		return null
 	},
-}))
+})
+
+startUiRefreshWatcher()

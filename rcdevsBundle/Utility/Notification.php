@@ -21,28 +21,34 @@
  *
  */
 
-namespace OCA\RCDevs\Utility;
+declare(strict_types=1);
 
-use OCA\RCDevs\Entity\NotificationEntity;
-use OCA\RCDevs\Entity\UsersListEntity;
-use OCA\RCDevs\Service\ConfigurationService;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
+namespace OCA\YumiSignNxtC\RCDevs\Utility;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstLogMessages;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Service\ConfigurationService;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+
+// Nextcloud Core
 use OCP\IURLGenerator;
-use OCP\Notification\IManager as INotificationManager;
 use OCP\L10N\IFactory;
+use OCP\Notification\IManager as INotificationManager;
 use OCP\Notification\INotification;
 use OCP\Notification\INotifier;
-
 
 class Notification implements INotifier
 {
 	public function __construct(
-		private		ConfigurationService	$configurationService,
-		protected	IFactory				$factory,
-		protected	INotificationManager	$notificationManager,
-		protected	IURLGenerator			$urlGenerator,
-		protected	LogRCDevs				$logRCDevs,
-	) {}
+		private ConfigurationService $configurationService,
+		protected IFactory $factory,
+		protected INotificationManager $notificationManager,
+		protected IURLGenerator $urlGenerator,
+		protected LogRCDevs $logRCDevs
+	) {
+	}
 
 	/**
 	 * Identifier of the notifier, only use [a-z0-9_]
@@ -53,7 +59,7 @@ class Notification implements INotifier
 		try {
 			return $this->configurationService->getAppId();
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
 		}
 	}
@@ -67,7 +73,7 @@ class Notification implements INotifier
 		try {
 			return $this->factory->get($this->configurationService->getAppId())->t("Add {$this->configurationService->getAppId()}");
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
 		}
 	}
@@ -76,8 +82,10 @@ class Notification implements INotifier
 	 * @param INotification $notification
 	 * @param string $languageCode The code of the language that should be used to prepare the notification
 	 */
-	public function prepare(INotification $notification, string $languageCode): INotification
-	{
+	public function prepare(
+		INotification $notification,
+		string $languageCode
+	): INotification {
 		try {
 			if ($notification->getApp() !== $this->configurationService->getAppId()) {
 				// $this->logRCDevs->debug(vsprintf('Prepare notification : [%s] vs [%s]', [$notification->getApp(), $this->configurationService->getAppId()]), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
@@ -97,13 +105,13 @@ class Notification implements INotifier
 
 				$parameters = $notification->getSubjectParameters();
 				// If sign process returns a false/0 code, an Exception notification will be displayed
-				$subject = ($parameters[CstRequest::CODE]
+				$subject = ($parameters[CstReturn::CODE]
 					? '{message}'
 					: "{$this->configurationService->getApplicationNameShort()} error; contact your administrator"
 				);
 
 				// Prepare the message for internationalization
-				$parameters[CstRequest::MESSAGE]	= $l->t($parameters[CstRequest::MESSAGE]);
+				$parameters[CstReturn::MESSAGE]	= $l->t($parameters[CstReturn::MESSAGE]);
 				$parameters[CstRequest::STATUS]		= $l->t($parameters[CstRequest::STATUS]);
 
 				// Fill the data for the notification
@@ -121,7 +129,7 @@ class Notification implements INotifier
 
 			return $notification;
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
 		}
 	}

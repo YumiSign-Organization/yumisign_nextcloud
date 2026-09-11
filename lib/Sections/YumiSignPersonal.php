@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace OCA\YumiSignNxtC\Sections;
 
 use OCA\YumiSignNxtC\Service\ConfigurationService;
-use OCP\IConfig;
+use OCP\IAppConfig;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;
@@ -16,7 +16,7 @@ class YumiSignPersonal implements IIconSection
 
 	public function __construct(
 		private		IL10N			$l10nYmsPersonalSection,
-		private		IConfig			$config,
+		private		IAppConfig			$config,
 		private		IURLGenerator	$url,
 	) {
 		$this->configurationService = new ConfigurationService($config);

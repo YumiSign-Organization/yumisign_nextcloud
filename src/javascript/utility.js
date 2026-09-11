@@ -1,15 +1,59 @@
 import { appName, apiv1 } from './config.js';
 import { generateOcsUrl, generateUrl } from '@nextcloud/router';
+import { loadState } from '@nextcloud/initial-state';
 import Vue from 'vue';
 
 Vue.prototype.t = t;
 
+let debugVueJs = false;
+
+try {
+	debugVueJs = loadState(appName, 'debugVueJs', false) === true;
+	console.log(`App:${appName}-debug:${debugVueJs}`);
+} catch (error) {
+	debugVueJs = false;
+}
+
+export const setDebugVueJs = (enabled) => {
+	debugVueJs = enabled === true;
+	console.log(`App:${appName}-debug:${debugVueJs}`);
+};
+
 export const getBasename = (chosenFile) => {
 	try {
-		return chosenFile ? chosenFile._attributes.basename : '';
+		if (!chosenFile) {
+			return '';
+		}
+
+		if (typeof chosenFile.basename !== 'undefined') {
+			return chosenFile.basename ?? '';
+		}
+
+		return chosenFile._attributes?.basename ?? '';
 	} catch (error) {
 		console.error(error.message);
 	}
+};
+
+export const CDEM = (payload) => {
+	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+		throw new Error('Payload is not a CDEM object');
+	}
+
+	const mandatoryKeys = ['code', 'data', 'error', 'message'];
+
+	for (const key of mandatoryKeys) {
+		if (!Object.prototype.hasOwnProperty.call(payload, key)) {
+			throw new Error(`Payload is not a CDEM object: missing key "${key}"`);
+		}
+	}
+
+	return {
+		code: payload.code,
+		data: payload.data,
+		error: payload.error,
+		message: payload.message,
+	};
 };
 
 export const getAppUrl = (apiUrl) => {
@@ -159,16 +203,11 @@ export const isValidResponse = (response) => {
 			throw new Error('Response data is missing');
 		}
 
-		if (!response.data.code) {
+		if (!Object.prototype.hasOwnProperty.call(response.data, 'code')) {
 			throw new Error('Response data code is missing');
 		}
 
-		return (
-			parseInt(response.data.code) === 1 ||
-			parseInt(response.data.code) === 2 ||
-			parseInt(response.data.code) === 200 ||
-			response.data.code === true
-		);
+		return parseInt(response.data.code) === 0;
 
 	} catch (error) {
 		return false;
@@ -184,12 +223,59 @@ export const isValidJSON = (str) => {
 	}
 };
 
+export const getFunctionName = () => {
+	try {
+		const stack = new Error().stack;
+
+		if (!stack) {
+			return 'anonymous';
+		}
+
+		const stackLines = stack
+			.split('\n')
+			.map((line) => line.trim())
+			.filter(Boolean);
+
+		for (const callerLine of stackLines.slice(1)) {
+			const functionMatch = callerLine.match(/^at\s+(?:async\s+)?(.+?)\s+\(/) ?? callerLine.match(/^at\s+(?:async\s+)?(.+)$/);
+
+			if (!functionMatch) {
+				continue;
+			}
+
+			let functionName = functionMatch[1].trim();
+
+			if (
+				functionName.startsWith('http://') ||
+				functionName.startsWith('https://') ||
+				functionName.startsWith('/')
+			) {
+				continue;
+			}
+
+			functionName = functionName.split('.').pop();
+
+			if (functionName && functionName !== 'getFunctionName') {
+				return functionName;
+			}
+		}
+
+		return 'anonymous';
+	} catch (error) {
+		return 'anonymous';
+	}
+};
+
 export const log = {
 	debug: (message) => {
-		console.debug(`DEBUG: ${message}`);
+		if (debugVueJs) {
+			console.debug(`DEBUG: ${message}`);
+		}
 	},
 	info: (message) => {
-		console.info(`INFO: ${message}`);
+		if (debugVueJs) {
+			console.info(`INFO: ${message}`);
+		}
 	},
 	warn: (message) => {
 		console.warn(`WARN: ${message}`);

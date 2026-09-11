@@ -21,11 +21,13 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Db;
 
 // use JsonSerializable;
 
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
+use OCA\YumiSignNxtC\Constant\CstEntity;
 use OCP\AppFramework\Db\Entity;
 
 class SignSession extends Entity
@@ -78,5 +80,19 @@ class SignSession extends Entity
 		$this->addType('workflowId',	CstEntity::INTEGER);
 		$this->addType('workflowName',	CstEntity::STRING);
 		$this->addType('workspaceId',	CstEntity::INTEGER);
+	}
+
+	public function setGlobalStatus(
+		$value
+	): void {
+		$normalized = is_string($value) ? strtolower(trim($value)) : $value;
+		$this->setter('globalStatus', [$normalized]);
+	}
+
+	public function setStatus(
+		$value
+	): void {
+		$normalized = is_string($value) ? strtolower(trim($value)) : $value;
+		$this->setter('status', [$normalized]);
 	}
 }

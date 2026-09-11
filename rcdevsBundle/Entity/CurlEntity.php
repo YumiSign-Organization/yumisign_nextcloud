@@ -21,7 +21,9 @@
  *
  */
 
-namespace OCA\RCDevs\Entity;
+declare(strict_types=1);
+
+namespace OCA\YumiSignNxtC\RCDevs\Entity;
 
 use CurlHandle;
 use JsonSerializable;

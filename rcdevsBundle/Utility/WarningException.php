@@ -21,7 +21,9 @@
  *
  */
 
-namespace OCA\RCDevs\Utility;
+declare(strict_types=1);
+
+namespace OCA\YumiSignNxtC\RCDevs\Utility;
 
 use Exception;
 

@@ -21,45 +21,47 @@
  *
  */
 
-namespace OCA\RCDevs\Service;
+declare(strict_types=1);
 
+namespace OCA\YumiSignNxtC\RCDevs\Service;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstCommon;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstException;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstFile;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\RCDevs\Entity\UserEntity;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\Helpers;
+
+// Nextcloud Core
 use Exception;
-use OCA\RCDevs\Entity\UserEntity;
-use OCA\RCDevs\Utility\Constantes\CstCommon;
-use OCA\RCDevs\Utility\Constantes\CstException;
-use OCA\RCDevs\Utility\Constantes\CstFile;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
-use OCA\RCDevs\Utility\Helpers;
-use OCA\RCDevs\Utility\LogRCDevs;
 use OCP\Files\File;
 use OCP\Files\Folder;
-use OCP\FilesMetadata\IFilesMetadataManager;
 
 class FileService
 {
-	public	Folder	$parentFolder;
-	public	File	$file;
-	public	string	$timedName;
-	private	string	$extensionSignedFile;
-	private	string	$timestamp;
+	public		Folder	$parentFolder;
+	public		File	$file;
+	public		string	$timedName;
+	protected	string	$extensionSignedFile;
+	protected	string	$timestamp;
 
 	public function __construct(
-		private ConfigurationService $configurationService,
-		private IFilesMetadataManager $filesMetadataManager,
-		private LogRCDevs $logRCDevs,
-		private UserEntity $user,
-		public int $id,
-		public bool $toSeal = false,
-		public bool $changeExtension = false,
-	) {
-		try {
-			/** @var Node $tmpNode */
-			$tmpNode = $user->getFolder()->getById($this->id)[0];
+		protected	LogRCDevs $logRCDevs,
+		protected	UserEntity $user,
+		public		int $id,
+		) {
+			try {
+				$tmpNodes = $user->getFolder()->getById($this->id);
+				$tmpNode = $tmpNodes[0] ?? null;
 
-			// Signing a folder is not allowed
-			if ($tmpNode->getType() !== \OCP\Files\FileInfo::TYPE_FILE) {
-				throw new Exception(CstException::TYPE_NOT_FILE, 1);
-			}
+				// Signing a folder is not allowed
+				if (!$tmpNode instanceof File) {
+					throw new Exception(CstException::TYPE_NOT_FILE, 1);
+				}
 
 			$this->file = $tmpNode;
 
@@ -69,31 +71,16 @@ class FileService
 
 			$this->parentFolder = $this->file->getParent();
 			$this->timestamp = $user->getTimedLocales();
-
-			// $textualComplement
-			$sealComplement = ($this->configurationService->textualComplementSeal() === '' ? $this->configurationService->getAppNameSealed() : $this->configurationService->textualComplementSeal());
-			$signComplement = ($this->configurationService->textualComplementSign() === '' ? $this->configurationService->getAppNameSigned() : $this->configurationService->textualComplementSign());
-
-			$this->timedName = vsprintf(
-				'%s_%s_%s.%s',
-				[
-					pathinfo($this->file->getName(), PATHINFO_FILENAME), // original filename without extension
-					($this->toSeal ?
-						$sealComplement :
-						$signComplement
-					),
-					$this->timestamp,
-					$this->extensionSignedFile, // original extension
-				]
-			);
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error("Issue on file creation {$this->timedName}: {$th->getMessage()}", __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error("Issue on file creation {$this->file->getName()}: {$th->getMessage()}", __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			throw $th;
 		}
 	}
 
-	public function create(mixed $temporaryFile, bool $eraseOriginal = false): File
-	{
+	public function create(
+		mixed $temporaryFile,
+		bool $eraseOriginal = false
+	): File {
 		try {
 			// If signed file is not a PDF but P7S, force to "not erase original"
 			$eraseOriginal = $eraseOriginal && Helpers::isPdf($this->timedName);
@@ -130,17 +117,17 @@ class FileService
 			];
 
 			$returned = [
-				CstRequest::CODE	=> 1,
-				CstRequest::DATA	=> $data,
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> $message,
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> $data,
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> $message,
 			];
 		} catch (\Throwable $th) {
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
