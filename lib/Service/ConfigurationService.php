@@ -21,14 +21,23 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Service;
 
-use OCA\RCDevs\Service\ConfigurationService as RCDevsConfigurationService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
-use OCP\IConfig;
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Service\ConfigurationService as RCDevsConfigurationService;
+
+// RCDevs App
+use OCA\YumiSignNxtC\Constant\CstEntity;
+use OCA\YumiSignNxtC\Constant\CstSettings;
+
+// Nextcloud Core
+use OCP\IAppConfig;
 
 class ConfigurationService extends RCDevsConfigurationService
 {
+	private		bool		$debugVueJs;
 	private		string		$scope;
 	private		string		$ttl;
 	private		string		$urlAppNoApi;
@@ -51,7 +60,7 @@ class ConfigurationService extends RCDevsConfigurationService
 	protected	string		$urlApp;
 
 	public function __construct(
-		private		IConfig	$config,
+		private		IAppConfig	$config,
 	) {
 		parent::__construct($config);
 
@@ -59,6 +68,7 @@ class ConfigurationService extends RCDevsConfigurationService
 		 * Read config.xml file
 		 */
 		// Standard parameters
+		$this->debugVueJs				= filter_var($this->configXml['debug-vuejs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 		$this->scope					= rtrim($this->configXml['scope']);
 		$this->ttl						= rtrim($this->configXml['ttl']);
 
@@ -90,7 +100,7 @@ class ConfigurationService extends RCDevsConfigurationService
 	public function getClientId(): string
 	{
 		try {
-			return $this->config->getAppValue($this->getAppId(), 'client_id');
+			return $this->config->getValueString($this->getAppId(), CstSettings::CLIENT_ID);
 		} catch (\Throwable $th) {
 			throw $th;
 		}
@@ -99,7 +109,16 @@ class ConfigurationService extends RCDevsConfigurationService
 	public function getClientSecret(): string
 	{
 		try {
-			return $this->config->getAppValue($this->getAppId(), 'client_secret');
+			return $this->config->getValueString($this->getAppId(), CstSettings::CLIENT_SECRET);
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public function getDebugVueJs(): bool
+	{
+		try {
+			return $this->debugVueJs;
 		} catch (\Throwable $th) {
 			throw $th;
 		}
@@ -150,8 +169,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlCancel(int $workflowId): string
-	{
+	public function getUrlCancel(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlCancel, [
 				$this->getWorkspaceId(),
@@ -162,8 +182,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlDebrief(int $workflowId): string
-	{
+	public function getUrlDebrief(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlDebrief, [
 				$this->getWorkspaceId(),
@@ -174,8 +195,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlEnvelopes(array $envelopesIds): string
-	{
+	public function getUrlEnvelopes(
+		array $envelopesIds
+	): string {
 		try {
 			// Create array parameters
 			$envelopesParameters = '';
@@ -226,8 +248,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlPreferences(int $workflowId): string
-	{
+	public function getUrlPreferences(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlPreferences, [
 				$this->getWorkspaceId(),
@@ -238,8 +261,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlRecipients(int $workflowId): string
-	{
+	public function getUrlRecipients(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlRecipients, [
 				$this->getWorkspaceId(),
@@ -250,8 +274,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlSession(int $workflowId): string
-	{
+	public function getUrlSession(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlSession, [
 				$this->getWorkspaceId(),
@@ -262,8 +287,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlStartWorkflow(int $workflowId): string
-	{
+	public function getUrlStartWorkflow(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlStartWorkflow, [
 				$this->getWorkspaceId(),
@@ -274,8 +300,9 @@ class ConfigurationService extends RCDevsConfigurationService
 		}
 	}
 
-	public function getUrlSteps(int $workflowId): string
-	{
+	public function getUrlSteps(
+		int $workflowId
+	): string {
 		try {
 			return $this->getUrlApp() . vsprintf($this->urlSteps, [
 				$this->getWorkspaceId(),
@@ -319,7 +346,7 @@ class ConfigurationService extends RCDevsConfigurationService
 	public function getWorkspaceId(): string
 	{
 		try {
-			$workspaceId = $this->config->getAppValue($this->getAppId(), CstEntity::WORKSPACE_ID);
+			$workspaceId = $this->config->getValueString($this->getAppId(), CstEntity::WORKSPACE_ID);
 			return $workspaceId;
 		} catch (\Throwable $th) {
 			throw $th;
@@ -329,7 +356,7 @@ class ConfigurationService extends RCDevsConfigurationService
 	public function getWorkspaceName(): string
 	{
 		try {
-			return $this->config->getAppValue($this->getAppId(), CstEntity::WORKSPACE_NAME);
+			return $this->config->getValueString($this->getAppId(), CstEntity::WORKSPACE_NAME);
 		} catch (\Throwable $th) {
 			throw $th;
 		}

@@ -37,6 +37,7 @@ OC.L10N.register(
     "Periodicity" : "Périodicité",
     "Checking Cron" : "Vérification de la planification",
     "The cron job is activated" : "La tâche planifiée est activée",
+    "The cron job is activated; it has never run yet" : "La tâche planifiée est activée ; elle n'a encore jamais été exécutée",
     "The cron job is activated; the last time the job ran was at %s" : "La tâche planifiée est activée ; la dernière exécution du processus était à %s",
     "The cron job was disabled at %s" : "La tâche cron a été désactivée à %s",
     "The cron job has been activated at %s" : "La tâche cron a été activée à %s",
@@ -150,6 +151,13 @@ OC.L10N.register(
     "not applicable" : "non applicable",
     "not found" : "non trouvée",
     "started" : "débutée",
-    "Define the execution periodicity of the background job that checks for completed signature requests." : "Définir la périodicité d'exécution de la tâche d'arrière-plan qui vérifie si les demandes de signature sont terminées."
+    "Define the execution periodicity of the background job that checks for completed signature requests." : "Définir la périodicité d'exécution de la tâche d'arrière-plan qui vérifie si les demandes de signature sont terminées.",
+    "Signed document folders" : "Dossiers des documents signés",
+    "Paths are relative to your Files root. Folders are created only when saving a successfully signed document." : "Les chemins sont relatifs à la racine de vos fichiers. Les dossiers sont créés uniquement lors de la sauvegarde après réussite complète de la signature.",
+    "As applicant" : "En tant que demandeur",
+    "As recipient" : "En tant que signataire",
+    "Invalid signed folder settings block signing. Correct the error to continue." : "Une erreur dans les dossiers de sauvegarde bloque la signature. Corrigez cette erreur pour continuer.",
+    "Saving…" : "Enregistrement…",
+    "Overwrite existing signed files in the destination folder (disabled: add a numbered suffix)" : "Écraser les fichiers signés existants dans le dossier de destination (sinon : ajout d’un suffixe numéroté)"
 },
 "");

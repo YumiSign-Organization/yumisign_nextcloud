@@ -21,12 +21,18 @@
  *
  */
 
-namespace OCA\RCDevs\Service;
+declare(strict_types=1);
 
+namespace OCA\YumiSignNxtC\RCDevs\Service;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstLogMessages;
+use OCA\YumiSignNxtC\RCDevs\Entity\CurlEntity;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+
+// Nextcloud Core
 use CurlHandle;
-use OCA\RCDevs\Entity\CurlEntity;
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCP\IConfig;
+use OCP\IAppConfig;
 
 class CurlService
 {
@@ -36,7 +42,7 @@ class CurlService
 	protected	string					$credentialKeyBundle;
 	
 	public function __construct(
-		private		IConfig		$configBundle,
+		private	IAppConfig	$configBundle,
 		private	LogRCDevs	$logRCDevsBundle,
 	) {
 		$this->configurationServiceBundle = new ConfigurationService($configBundle);
@@ -46,25 +52,28 @@ class CurlService
 	 * PUBLIC
 	 ****************************************************************************************** */
 
-	public function addCredentialKey(string $credentialKeyBundle)
-	{
+	public function addCredentialKey(
+		string $credentialKeyBundle
+	) {
 		try {
 			$this->credentialKeyBundle = $credentialKeyBundle;
 		} catch (\Throwable $th) {
-			$this->logRCDevsBundle->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevsBundle->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()),	__FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 		}
 	}
 
-	public function checkCurlBody(string $functionName)
-	{
+	public function checkCurlBody(
+		string $functionName
+	) {
 		if (is_null(json_decode($this->curlEntityBundle->getBody()))) {
 			$message = sprintf("cURL returned empty body in process \"%s\".", $functionName);
 			$this->logRCDevsBundle->debug($message, __FUNCTION__, true);
 		}
 	}
 
-	public function checkCurlCode(string $functionName)
-	{
+	public function checkCurlCode(
+		string $functionName
+	) {
 		if (($this->curlEntityBundle->getCode() !== 200) && ($this->curlEntityBundle->getCode() !== 302)) {
 			$message = sprintf("cURL returned unwanted code (%s). This process is skipped for function %s.", $this->curlEntityBundle->getCode(), $functionName);
 			$this->logRCDevsBundle->debug($message, __FUNCTION__, true);
@@ -85,8 +94,11 @@ class CurlService
 		return $this->curlEntityBundle;
 	}
 
-	public function setCurlEnv(string $url, string $requestType, bool $contentTypeJson = true): void
-	{
+	public function setCurlEnv(
+		string $url,
+		string $requestType,
+		bool $contentTypeJson = true
+	): void {
 		$this->curlHandleBundle = curl_init();
 
 		curl_setopt($this->curlHandleBundle, CURLOPT_URL, $url);
@@ -122,8 +134,10 @@ class CurlService
 		]);
 	}
 
-	public function setOpt(int $option, mixed $value): void
-	{
+	public function setOpt(
+		int $option,
+		mixed $value
+	): void {
 		curl_setopt($this->curlHandleBundle, $option, $value);
 	}
 }

@@ -67,6 +67,8 @@ export default {
 		resolvePromise: undefined,
 		rejectPromise: undefined,
 		itemId: undefined,
+		items: [],
+		onSelect: null,
 	}),
 
 	methods: {
@@ -75,7 +77,7 @@ export default {
 			this.message = opts.message;
 			this.items = opts.items;
 			this.okButton = opts.okButton;
-			this.updateId = opts.updateId;
+			this.onSelect = opts.updateId;
 			this.itemId = undefined;
 
 			if (opts.cancelButton) {
@@ -91,7 +93,8 @@ export default {
 		},
 
 		updateId(item) {
-			this.opts.updateId(item);
+			this.itemId = item;
+			this.onSelect(item);
 		},
 
 		_confirm() {

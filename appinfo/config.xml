@@ -1,12 +1,8 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-	<api-key-name>X-YumiSign-Api-Key</api-key-name>
-	<app-main-logo>YumiSign.svg</app-main-logo>
-	<app-short-name>YumiSign</app-short-name>
-	<items-per-page>10</items-per-page>
-	<name-signed>YMSSigned</name-signed>
+	<!-- RCDevs App -->
+	<debug-vuejs>true</debug-vuejs>
 	<scope>openid</scope>
-	<table-name-sessions>yumisign_nxtc_sess</table-name-sessions>
 	<token-name>Authorization: Bearer</token-name>
 	<ttl>600</ttl>
 
@@ -29,6 +25,39 @@
 	<url-workflows>/workspaces/%s/workflows</url-workflows>
 	<url-workspaces-id>/workspaces/%s</url-workspaces-id>
 	<url-workspaces>/workspaces</url-workspaces>
+
+	<!-- RCDevs Bundle -->
+	<api-key-name>X-YumiSign-Api-Key</api-key-name>
+	<app-main-logo>YumiSign.svg</app-main-logo>
+	<app-name-abbr>YMS</app-name-abbr>
+	<app-name-short>YumiSign</app-name-short>
+	<name-signed>YMSSigned</name-signed>
+
+	<!-- SESSIONS -->
+	<items-per-listing>1000</items-per-listing>
+	<items-per-page>10</items-per-page>
+	<table-name-sessions>yumisign_nxtc_sess</table-name-sessions>
+
+	<!-- LOGS -->
+	<log-config>log_rcdevs</log-config>
+	<log-filename>logRCDevs.log</log-filename>
+
+	<!-- CRON JOB -->
+	<check-cron>OCA\YumiSignNxtC\BackgroundJob\CheckAsyncSignatureTask</check-cron>
+	<cron-interval>5</cron-interval>
+
 	<!-- STATUS -->
-	<status-pending>APPROVED,STARTED</status-pending>
+	<status-pending>APPROVED,PENDING,STARTED</status-pending>
+	<status-done>SIGNED</status-done>
+	<status-issue>CANCELED,DECLINED,ERROR,EXPIRED,FAILED,ISSUE,NOT APPLICABLE,NOT FOUND</status-issue>
+
+	<!-- TIMEOUT -->
+	<multiplication-factor-asynchronous>86400</multiplication-factor-asynchronous>
+	<multiplication-factor-synchronous>60</multiplication-factor-synchronous>
+	<cnx-time-out>3</cnx-time-out>
+	
+	<!-- USER SIGNED FOLDER -->
+	 <user-signed-folder-applicant>YMSSigned/applicant</user-signed-folder-applicant>
+	 <user-signed-folder-recipient>YMSSigned/recipient</user-signed-folder-recipient>
+
 </config>

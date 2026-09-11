@@ -74,6 +74,7 @@
 </template>
 
 <script>
+import $ from 'jquery';
 import './styles/yumisignStyle.css';
 import './styles/yumisignRoot.css';
 import {getT} from './javascript/utility.js';

@@ -26,6 +26,8 @@
 			<rcdevsCuteMessage></rcdevsCuteMessage>
 		</rcdevsMessageBanner>
 
+		<SignedFolderSettings :endpoint="signedFoldersEndpoint" :translate="translateSignedFolders" />
+
 		<rcdevsSettingsContainer id="rcdevsPortalConnectionYMS">
 			<rcdevsSettingsHeader>
 				<rcdevsSettingsTitle>{{ ui.messages.app.title }}</rcdevsSettingsTitle>
@@ -67,13 +69,15 @@
 </template>
 
 <script>
-import {getBasename, getAppUrl, getOcsUrl, getT, isEmail, isEmptyString, isEnabled, isFilledString, isNotEmail, isValidResponse, log} from '../javascript/utility';
+import SignedFolderSettings from '../../rcdevsBundle/src/components/SignedFolderSettings.vue';
+import {CDEM, getBasename, getAppUrl, getFunctionName as getUtilityFunctionName, getOcsUrl, getT, isEmail, isEmptyString, isEnabled, isFilledString, isNotEmail, isValidResponse, log} from '../javascript/utility';
 import {loadState} from '@nextcloud/initial-state';
 import $ from 'jquery';
 import axios from '@nextcloud/axios';
 
 export default {
 	name: 'PersonalSettings',
+	components: { SignedFolderSettings },
 
 	data() {
 		this.ui = {
@@ -113,6 +117,8 @@ export default {
 		//#endregion
 
 		return {
+			signedFoldersEndpoint: getAppUrl('/settings/signed-folders'),
+			translateSignedFolders: getT,
 			//#region Returned values
 			accessTokenDeleted: null,
 			accessTokenRegistered: null,
@@ -156,9 +162,9 @@ export default {
 		this.proxyPassword = initialSettings.proxyPassword;
 		this.proxyPort = initialSettings.proxyPort;
 		this.proxyUsername = initialSettings.proxyUsername;
-		this.signTypeAdvanced = initialSettings.signTypeAdvanced;
-		this.signTypeQualified = initialSettings.signTypeQualified;
-		this.signTypeStandard = initialSettings.signTypeStandard;
+		this.sign_type_advanced = initialSettings.sign_type_advanced;
+		this.sign_type_qualified = initialSettings.sign_type_qualified;
+		this.sign_type_standard = initialSettings.sign_type_standard;
 		this.state = initialSettings.state;
 		this.textualComplementSign = initialSettings.textualComplementSign;
 		this.useProxy = initialSettings.useProxy;
@@ -167,7 +173,7 @@ export default {
 		// Specific
 		this.ymsApiAuthorize = initialSettings.ymsApiAuthorize;
 
-		console.log(`initialSettings:[${JSON.stringify(initialSettings)}]`);
+		log.debug(`initialSettings:[${JSON.stringify(initialSettings)}]`);
 		//#endregion
 	},
 
@@ -189,16 +195,17 @@ export default {
 					})
 					.then((response) => {
 						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						const cdem = CDEM(response.data);
 
 						// Check results
-						if (!isValidResponse(response)) {
+						if (cdem.code !== 0) {
 							throw new Error('Checking failed');
 						}
 						this.axiosSettings.success = true;
 						// Apply values
-						this.accessTokenRegistered = response.data.data.tokenRegistered;
-						this.tokenOk = response.data.data.tokenRegistered;
-						this.axiosSettings.message = getT(response.data.message);
+						this.accessTokenRegistered = cdem.data.tokenRegistered;
+						this.tokenOk = cdem.data.tokenRegistered;
+						this.axiosSettings.message = getT(cdem.message);
 						this.axiosSettings.messageDelete = '';
 					})
 					.catch((exception) => {
@@ -234,16 +241,17 @@ export default {
 					})
 					.then((response) => {
 						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						const cdem = CDEM(response.data);
 
 						// Check results
-						if (!isValidResponse(response)) {
+						if (cdem.code !== 0) {
 							throw new Error('Deleting failed');
 						}
 						this.axiosSettings.success = true;
 						// Apply values
-						this.accessTokenDeleted = response.data.data.tokenDeleted;
-						this.tokenOk = response.data.data.tokenRegistered;
-						this.axiosSettings.messageDelete = getT(response.data.message);
+						this.accessTokenDeleted = cdem.data.tokenDeleted;
+						this.tokenOk = cdem.data.tokenRegistered;
+						this.axiosSettings.messageDelete = getT(cdem.message);
 					})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
@@ -278,16 +286,17 @@ export default {
 					})
 					.then((response) => {
 						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						const cdem = CDEM(response.data);
 
 						// Check results
-						if (!isValidResponse(response)) {
+						if (cdem.code !== 0) {
 							throw new Error('Checking failed');
 						}
 						this.axiosSettings.success = true;
 						// Apply values
-						this.accessTokenRegistered = response.data.data.tokenRegistered;
-						this.tokenOk = response.data.data.tokenRegistered;
-						this.axiosSettings.message = getT(response.data.message);
+						this.accessTokenRegistered = cdem.data.tokenRegistered;
+						this.tokenOk = cdem.data.tokenRegistered;
+						this.axiosSettings.message = getT(cdem.message);
 					})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
@@ -318,14 +327,9 @@ export default {
 			}
 		},
 
-		getFunctionName: function () {
-			const error = new Error();
-			const stackLines = error.stack.split('\n');
-			// The stack trace format can vary; you may need to adjust the index
-			const callerLine = stackLines[2].trim();
-			const functionName = callerLine.split(' ')[1];
-			return functionName;
-		},
+			getFunctionName: function () {
+				return getUtilityFunctionName();
+			},
 
 		hideQuietly: function (element, speed = 1000) {
 			setTimeout(function () {

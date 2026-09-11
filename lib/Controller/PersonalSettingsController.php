@@ -21,15 +21,17 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\RCDevs\Utility\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
+use OCA\YumiSignNxtC\Constant\CstCommon;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Services\IInitialState;
-use OCP\IConfig;
+use OCP\IAppConfig;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserManager;
@@ -41,7 +43,7 @@ class PersonalSettingsController extends Controller implements ISettings
 {
 	private	ConfigurationService	$configurationService;
 	private	string					$serverUrl;
-	private IConfig					$config;
+	private IAppConfig					$config;
 	private IUserManager			$userManager;
 	private string					$currentUserId;
 	private string|null				$redirectUri;
@@ -49,7 +51,7 @@ class PersonalSettingsController extends Controller implements ISettings
 	private string|null				$state;
 
 	public function __construct(
-		IConfig						$config,
+		IAppConfig						$config,
 		IRequest					$request,
 		IUserManager				$userManager,
 		private	IInitialState		$initialState,
@@ -76,11 +78,15 @@ class PersonalSettingsController extends Controller implements ISettings
 
 	public function getForm(): TemplateResponse
 	{
+		$now = (string) time();
+		$md5Now = md5($now);
+
 		$initialSettings = [
 			'clientId'			=> $this->configurationService->getClientId(),
-			'state'				=> hash_hmac(CstCommon::SHA256, $this->currentUserId . intval(time()) . md5(intval(time())), md5(intval(time()))),
+			'state'				=> hash_hmac(CstCommon::SHA256, $this->currentUserId . $now . $md5Now, $md5Now),
 			'ymsApiAuthorize'	=> '/oauth/connect',
 		];
+		$this->initialState->provideInitialState('debugVueJs', $this->configurationService->getDebugVueJs());
 		$this->initialState->provideInitialState('initialSettings', $initialSettings);
 		$this->logRCDevs->debug(sprintf('Initial Personal Settings provided : [%s]', json_encode($initialSettings)));
 

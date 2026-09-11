@@ -5,7 +5,7 @@ namespace OCA\YumiSignNxtC\Migration;
 use Closure;
 use Doctrine\DBAL\Types\Type;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
+use OCA\YumiSignNxtC\Constant\CstEntity;
 use OCP\DB\ISchemaWrapper;
 use OCP\IDBConnection;
 use OCP\Migration\IOutput;

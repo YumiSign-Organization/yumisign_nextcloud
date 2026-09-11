@@ -26,7 +26,6 @@
 				<rcdevsSettingsTitle>{{ getT('YumiSign for Nextcloud Settings') }}</rcdevsSettingsTitle>
 				<rcdevsSettingsItem>{{ getT('Installed version') }} : {{ installedVersion }}</rcdevsSettingsItem>
 				<rcdevsSettingsItem>{{ getT('Enter your YumiSign server settings in the fields below.') }}</rcdevsSettingsItem>
-				<rcdevsSettingsItem>{{ getT('After each settings modification, please save your settings.') }}</rcdevsSettingsItem>
 			</rcdevsSettingsHeader>
 
 			<rcdevsSettingsPartsContainer>
@@ -193,21 +192,21 @@
 
 				<!-- Enable Sign Standard -->
 				<rcdevsSettingsRow>
-					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="signTypeStandard" type="switch">{{ getT('Enable Simple signature') }}</NcCheckboxRadioSwitch>
+					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="sign_type_standard" type="switch">{{ getT('Enable Simple signature') }}</NcCheckboxRadioSwitch>
 				</rcdevsSettingsRow>
 
 				<!-- Enable Sign Advanced -->
 				<rcdevsSettingsRow>
-					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="signTypeAdvanced" type="switch">{{ getT('Enable Advanced signature') }}</NcCheckboxRadioSwitch>
+					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="sign_type_advanced" type="switch">{{ getT('Enable Advanced signature') }}</NcCheckboxRadioSwitch>
 				</rcdevsSettingsRow>
 
 				<!-- Enable Sign Qualified -->
 				<rcdevsSettingsRow>
-					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="signTypeQualified" type="switch">{{ getT('Enable Qualified signature') }}</NcCheckboxRadioSwitch>
+					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="sign_type_qualified" type="switch">{{ getT('Enable Qualified signature') }}</NcCheckboxRadioSwitch>
 				</rcdevsSettingsRow>
 
 				<rcdevsSettingsRow>
-					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="overwrite" type="switch">{{ getT('Overwrite the original PDF file with its signed copy (default: time-stamped copy)') }}</NcCheckboxRadioSwitch>
+					<NcCheckboxRadioSwitch class="rcdevsSettingsChkBox" :checked.sync="overwrite" type="switch">{{ getT('Overwrite existing signed files in the destination folder (disabled: add a numbered suffix)') }}</NcCheckboxRadioSwitch>
 				</rcdevsSettingsRow>
 
 				<!-- Textual Complements : Signed -->
@@ -261,27 +260,10 @@
 				</rcdevsSettingsRow>
 			</rcdevsSettingsPartsContainer>
 
-			<rcdevsSettingsFooter>
-				<rcdevsSettingsRow>
-					<rcdevsSettingsItem class="rcdevsSettingsLabel">
-						<button @click="saveSettings">
-							{{ getT('Save') }}
-						</button>
-					</rcdevsSettingsItem>
-					<rcdevsSettingsItem class="rcdevsSettingsInput">
-						<transition name="fade">
-							<p v-if="!saved" class="save_warning">
-								{{ getT('Do not forget to save your settings!') }}
-							</p>
-							<p v-if="success" id="save_success">
-								{{ getT('Your settings have been saved succesfully') }}
-							</p>
-							<p v-if="failure" id="save_failure">
-								{{ getT('There was an error saving settings') }}
-							</p>
-						</transition>
-					</rcdevsSettingsItem>
-				</rcdevsSettingsRow>
+			<rcdevsSettingsFooter v-if="failure">
+				<p id="save_failure" role="alert">
+					{{ getT('There was an error saving settings') }}
+				</p>
 			</rcdevsSettingsFooter>
 		</rcdevsSettingsContainer>
 
@@ -293,9 +275,10 @@
 <script>
 import {appName} from '../javascript/config.js';
 import {generateFilePath, generateOcsUrl} from '@nextcloud/router';
-import {getBasename, getOcsUrl, getT, isEmail, isEnabled, isValidResponse, log} from '../javascript/utility';
+import {getBasename, getFunctionName as getUtilityFunctionName, getOcsUrl, getT, isEmail, isEnabled, isValidResponse, log} from '../javascript/utility';
 import {loadState} from '@nextcloud/initial-state';
 import axios from '@nextcloud/axios';
+import {showError, showSuccess} from '@nextcloud/dialogs';
 import NcCheckboxRadioSwitch from '@nextcloud/vue/dist/Components/NcCheckboxRadioSwitch.js';
 import WorkspaceListIds from '../components/WorkspaceListIds.vue';
 
@@ -376,17 +359,19 @@ export default {
 			proxyPassword: this.$parent.proxyPassword,
 			proxyPort: this.$parent.proxyPort,
 			proxyUsername: this.$parent.proxyUsername,
-			signTypeAdvanced: this.$parent.signTypeAdvanced,
-			signTypeQualified: this.$parent.signTypeQualified,
-			signTypeStandard: this.$parent.signTypeStandard,
+			sign_type_advanced: this.$parent.sign_type_advanced,
+			sign_type_qualified: this.$parent.sign_type_qualified,
+			sign_type_standard: this.$parent.sign_type_standard,
 			textualComplementSign: this.$parent.textualComplementSign,
 			useProxy: this.$parent.useProxy,
 			workspaceId: this.$parent.workspaceId,
 			workspaceName: this.$parent.workspaceName,
 
-			success: false,
 			failure: false,
-			saved: false,
+			autosaveReady: false,
+			lastSavedSettings: null,
+			saveInProgress: false,
+			savePending: false,
 			MIN_TIMEOUT: 1,
 			MAX_SYNC_TIMEOUT: 5,
 			MAX_ASYNC_TIMEOUT: 30,
@@ -397,7 +382,35 @@ export default {
 		};
 	},
 
+	beforeDestroy() {
+		clearTimeout(this.saveTimer);
+		this.saveSettings();
+	},
+
 	computed: {
+		settingsPayload() {
+			return {
+				api_key: this.apiKey,
+				async_timeout: this.asyncTimeout,
+				client_id: this.clientId,
+				client_secret: this.clientSecret,
+				cron_interval: this.cronInterval,
+				description: this.description,
+				enable_sign: this.enableSign,
+				overwrite: this.overwrite,
+				proxy_host: this.proxyHost,
+				proxy_password: this.proxyPassword,
+				proxy_port: this.proxyPort,
+				proxy_username: this.proxyUsername,
+				sign_type_advanced: this.sign_type_advanced,
+				sign_type_qualified: this.sign_type_qualified,
+				sign_type_standard: this.sign_type_standard,
+				textual_complement_sign: this.textualComplementSign,
+				use_proxy: this.useProxy,
+				workspace_id: this.workspaceId,
+				workspace_name: this.workspaceName,
+			};
+		},
 		getTemplateFilenameSign: function () {
 			return this.changeTemplateFilename(this.textualComplementSign);
 		},
@@ -406,7 +419,7 @@ export default {
 	beforeMount() {
 		const initialSettings = loadState(appName, 'initialSettings');
 
-		console.log(`initialSettings:[${JSON.stringify(initialSettings)}]`);
+		log.debug(`initialSettings:[${JSON.stringify(initialSettings)}]`);
 
 		this.apiKey = initialSettings.apiKey;
 		this.asyncTimeout = initialSettings.asyncTimeout;
@@ -421,9 +434,9 @@ export default {
 		this.proxyPassword = initialSettings.proxyPassword;
 		this.proxyPort = initialSettings.proxyPort;
 		this.proxyUsername = initialSettings.proxyUsername;
-		this.signTypeAdvanced = initialSettings.signTypeAdvanced;
-		this.signTypeQualified = initialSettings.signTypeQualified;
-		this.signTypeStandard = initialSettings.signTypeStandard;
+		this.sign_type_advanced = initialSettings.sign_type_advanced;
+		this.sign_type_qualified = initialSettings.sign_type_qualified;
+		this.sign_type_standard = initialSettings.sign_type_standard;
 		this.textualComplementSign = initialSettings.textualComplementSign;
 		this.useProxy = initialSettings.useProxy;
 		this.workspaceId = initialSettings.workspaceId;
@@ -477,29 +490,7 @@ export default {
 		this.placeHolderclientSecret = this.getT('Optional, get from RCDevs');
 		this.placeHolderWorkspaceName = this.getT('Set a Workspace name');
 
-		// Add Event Listener on all inputs
-		const inputs = document.querySelectorAll('input');
-		inputs.forEach((input) => {
-			input.addEventListener('change', this.inputNotSaved);
-		});
-
-		// Add Event listener on NcCheckboxRadioSwitch (FYI, focus on main generated span tag to check if radio is checked or not: the radio does not throw an event)
-		const attrObserver = new MutationObserver((mutations) => {
-			mutations.forEach((mu) => {
-				if (mu.type === 'attributes' && mu.attributeName === 'class') {
-					this.inputNotSaved();
-				}
-			});
-		});
-
-		const ELS_test = document.querySelectorAll('.rcdevsSettingsChkBox');
-		ELS_test.forEach((el) => attrObserver.observe(el, {attributes: true}));
-
-		document.querySelectorAll('.rcdevsSettingsChkBox').forEach((btn) => {
-			btn.addEventListener('click', () => ELS_test.forEach((el) => el.classList.toggle(btn.dataset.class)));
-		});
-
-		this.saved = true;
+		this.initializeAutosave();
 
 		// Call server check
 		this.testConnection();
@@ -576,20 +567,20 @@ export default {
 					.get(getOcsUrl(this.apis.settingsCheckCron), {
 						signal: this.axiosChecking.abortCtrl.signal,
 					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						.then((response) => {
+							log.debug(`Response for ${JSON.stringify(response.data)}`);
 
-						// Check results
-						if (!isValidResponse(response)) {
-							throw new Error('Cron check failed');
-						}
-						this.axiosChecking.success = true;
-						// Apply values
-						this.reqCron.enable = true;
-						this.reqCron.code = response.data.code;
-						this.reqCron.message = response.data.message;
-						this.reqCron.status = `chk_${response.data.code}`;
-					})
+							// Check results
+							if (!response.data || !Object.prototype.hasOwnProperty.call(response.data, 'code')) {
+								throw new Error('Cron check failed');
+							}
+							this.axiosChecking.success = true;
+							// Apply values
+							this.reqCron.enable = true;
+							this.reqCron.code = response.data.code === true ? 1 : response.data.code === false ? 0 : response.data.code;
+							this.reqCron.message = getT(response.data.message);
+							this.reqCron.status = `chk_${response.data.code}`;
+						})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
 							this.axiosChecking.message = this.ui.axios.requestCancelled;
@@ -704,61 +695,35 @@ export default {
 			}
 		},
 
-		axiosSettingsRetrieveWorkspaceId: function () {
+		async axiosSettingsRetrieveWorkspaceId() {
+			const checking = this.initAxios();
+			this.axiosChecking = checking;
 			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosChecking = this.initAxios();
-
-				log.info(`Contact server to retrieve settings (workspace ID)`);
-
-				axios
-					.get(getOcsUrl(this.apis.settingsCheckWorkspaceId), {
-						signal: this.axiosChecking.abortCtrl.signal,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						// Check results
-						if (!response.data.hasOwnProperty('id')) {
-							throw new Error('YumiSign workspace ID is missing');
-						}
-						this.axiosChecking.success = true;
-						// Apply values
-						this.reqWspId.code = response.data.code;
-						this.reqWspId.id = response.data.id;
-						this.reqWspId.listId = response.data.listId;
-
-						// Show modal if needed.
-						if (this.reqWspId.listId.length > 1) {
-							this.showWorkspaceListIds(this.reqWspId.listId);
-						} else if (this.reqWspId.listId.length === 1) {
-							this.reqWspName.status = response.data.status;
-							this.reqWspId.enable = true;
-						}
-
-						this.reqWspId.message = response.data.message;
-						this.reqWspId.status = response.data.status;
-
-						this.workspaceId = response.data.id;
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosChecking.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosChecking.message = exception.message;
-						}
-
-						this.axiosChecking.error = true;
-					})
-					.finally(() => {
-						this.axiosChecking.inProgress = false;
-
-						this.reqWspId.request = false;
-						this.reqWspName.request = false;
-						this.reqWspName.checked = true;
-					});
+				const response = await axios.get(getOcsUrl(this.apis.settingsCheckWorkspaceId), {
+					signal: checking.abortCtrl.signal,
+					params: {workspace_name: this.workspaceName, workspace_id: ''},
+				});
+				const result = response.data;
+				if (!result.status || !Array.isArray(result.listId) || result.listId.length === 0) {
+					throw new Error(result.message || getT('No workspace found'));
+				}
+				Object.assign(this.reqWspId, result);
+				checking.success = true;
+				if (result.listId.length > 1) {
+					await this.showWorkspaceListIds(result.listId);
+				} else {
+					this.updateId(result.listId[0]);
+				}
 			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
+				checking.error = true;
+				checking.message = exception.message;
+				this.reqWspId.status = false;
+				this.reqWspId.message = exception.message;
+				showError(exception.message);
+			} finally {
+				checking.inProgress = false;
+				this.reqWspId.request = false;
+				this.reqWspName.request = false;
 			}
 		},
 
@@ -773,20 +738,20 @@ export default {
 					.get(getOcsUrl(this.apis.settingsJobReset), {
 						signal: this.axiosChecking.abortCtrl.signal,
 					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
+						.then((response) => {
+							log.debug(`Response for ${JSON.stringify(response.data)}`);
 
-						// Check results
-						if (!isValidResponse(response)) {
-							throw new Error('Job reset failed');
-						}
-						this.axiosChecking.success = true;
-						// Apply values
-						this.reqCron.enable = true;
-						this.reqCron.code = response.data.code;
-						this.reqCron.message = response.data.message;
-						this.reqCron.status = `chk_${response.data.code}`;
-					})
+							// Check results
+							if (!response.data || !Object.prototype.hasOwnProperty.call(response.data, 'code')) {
+								throw new Error('Job reset failed');
+							}
+							this.axiosChecking.success = true;
+							// Apply values
+							this.reqCron.enable = true;
+							this.reqCron.code = response.data.code === true ? 1 : response.data.code === false ? 0 : response.data.code;
+							this.reqCron.message = getT(response.data.message);
+							this.reqCron.status = `chk_${response.data.code}`;
+						})
 					.catch((exception) => {
 						if (axios.isCancel(exception)) {
 							this.axiosChecking.message = this.ui.axios.requestCancelled;
@@ -806,64 +771,63 @@ export default {
 			}
 		},
 
-		axiosSettingsSave: function () {
+		initializeAutosave() {
+			this.lastSavedSettings = JSON.stringify(this.settingsPayload);
+			this.autosaveReady = true;
+			this.$watch('settingsPayload', this.scheduleSave);
+		},
+
+		scheduleSave() {
+			if (!this.autosaveReady) {
+				return;
+			}
+			clearTimeout(this.saveTimer);
+			this.savePending = true;
+			this.saveTimer = setTimeout(() => this.saveSettings(), 400);
+		},
+
+		async saveSettings() {
+			clearTimeout(this.saveTimer);
+			if (!this.autosaveReady || this.saveInProgress || !this.savePending) {
+				return;
+			}
+
+			const payload = this.settingsPayload;
+			const snapshot = JSON.stringify(payload);
+			if (snapshot === this.lastSavedSettings) {
+				this.savePending = false;
+				this.failure = false;
+				return;
+			}
+			if (!Number.isInteger(Number(payload.async_timeout))
+				|| Number(payload.async_timeout) < this.MIN_TIMEOUT
+				|| Number(payload.async_timeout) > this.MAX_ASYNC_TIMEOUT
+				|| !Number.isInteger(Number(payload.cron_interval))
+				|| Number(payload.cron_interval) < this.MIN_CRON_INTERVAL
+				|| Number(payload.cron_interval) > this.MAX_CRON_INTERVAL) {
+				this.failure = true;
+				return;
+			}
+
+			this.savePending = false;
+			this.saveInProgress = true;
+			this.failure = false;
 			try {
-				log.debug(`[${this.getFunctionName()}] Running...`);
-				this.axiosChecking = this.initAxios();
-
-				log.info(`Contact server to save settings`);
-
-				axios
-					.post(getOcsUrl(this.apis.settingsSave), {
-						api_key: this.apiKey,
-						async_timeout: this.asyncTimeout,
-						client_id: this.clientId,
-						client_secret: this.clientSecret,
-						cron_interval: this.cronInterval,
-						description: this.description,
-						enable_sign: this.enableSign,
-						overwrite: this.overwrite,
-						proxy_host: this.proxyHost,
-						proxy_password: this.proxyPassword,
-						proxy_port: this.proxyPort,
-						proxy_username: this.proxyUsername,
-						sign_type_advanced: this.signTypeAdvanced,
-						sign_type_qualified: this.signTypeQualified,
-						sign_type_standard: this.signTypeStandard,
-						textual_complement_sign: this.textualComplementSign,
-						use_proxy: this.useProxy,
-						workspace_id: this.workspaceId,
-						workspace_name: this.workspaceName,
-					})
-					.then((response) => {
-						log.debug(`Response for ${JSON.stringify(response.data)}`);
-
-						// Check results
-						if (!isValidResponse(response)) {
-							throw new Error('Saving failed');
-						}
-						this.axiosChecking.success = true;
-						// Apply values
-						this.success = true;
-						this.saved = true;
-					})
-					.catch((exception) => {
-						if (axios.isCancel(exception)) {
-							this.axiosChecking.message = this.ui.axios.requestCancelled;
-						} else {
-							this.axiosChecking.message = exception.message;
-						}
-
-						this.axiosChecking.error = true;
-						// Apply values
-						this.failure = true;
-						this.saved = false;
-					})
-					.finally(() => {
-						this.axiosChecking.inProgress = false;
-					});
+				const response = await axios.post(getOcsUrl(this.apis.settingsSave), payload);
+				if (!isValidResponse(response)) {
+					throw new Error('Saving failed');
+				}
+				this.lastSavedSettings = snapshot;
+				if (!this.savePending && snapshot === JSON.stringify(this.settingsPayload)) {
+					showSuccess(getT('Settings saved'), {timeout: 2500});
+				}
 			} catch (exception) {
-				log.error(`[${this.getFunctionName()}] ${exception}`);
+				this.failure = true;
+			} finally {
+				this.saveInProgress = false;
+				if (this.savePending) {
+					this.saveSettings();
+				}
 			}
 		},
 
@@ -932,14 +896,9 @@ export default {
 			return `${myDate.slice(0, 3).join(`-`)} ${myDate.slice(3, 6).join(`:`)}.${myDate.slice(-1)[0]}`;
 		},
 
-		getFunctionName: function () {
-			const error = new Error();
-			const stackLines = error.stack.split('\n');
-			// The stack trace format can vary; you may need to adjust the index
-			const callerLine = stackLines[2].trim();
-			const functionName = callerLine.split(' ')[1];
-			return functionName;
-		},
+			getFunctionName: function () {
+				return getUtilityFunctionName();
+			},
 
 		initAxios: function () {
 			try {
@@ -956,10 +915,6 @@ export default {
 			}
 		},
 
-		inputNotSaved(event) {
-			this.saved = false;
-		},
-
 		reset_job() {
 			this.reqCron.enable = true;
 			this.reqCron.request = true;
@@ -971,7 +926,6 @@ export default {
 			this[refData] = '';
 			this.$refs[refData].focus();
 
-			this.saved = false;
 		},
 
 		retrieveCronStatus() {
@@ -988,18 +942,6 @@ export default {
 			this.axiosSettingsRetrieveWorkspaceId();
 		},
 
-		saveSettings() {
-			this.success = false;
-			this.failure = false;
-
-			if (this.asyncTimeout < this.MIN_TIMEOUT || this.asyncTimeout > this.MAX_ASYNC_TIMEOUT || this.cronInterval < this.MIN_CRON_INTERVAL || this.cronInterval > this.MAX_CRON_INTERVAL) {
-				this.failure = true;
-				return;
-			}
-
-			this.axiosSettingsSave();
-		},
-
 		async showWorkspaceListIds(listId) {
 			const ok = await this.$refs.WorkspaceListIds.show({
 				title: this.getT('Choose workspace ID'),
@@ -1012,7 +954,7 @@ export default {
 
 			if (ok) {
 				// eslint-disable-next-line
-				console.log('OK');
+				log.debug('OK');
 			}
 		},
 
@@ -1028,7 +970,7 @@ export default {
 		},
 
 		updateId(wspId) {
-			this.workspaceId = wspId;
+			this.workspaceId = String(wspId);
 		},
 	},
 };

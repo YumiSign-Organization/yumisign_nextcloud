@@ -21,8 +21,15 @@
  *
  */
 
-namespace OCA\RCDevs\Entity;
+declare(strict_types=1);
 
+namespace OCA\YumiSignNxtC\RCDevs\Entity;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstApplication;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstDate;
+
+// Nextcloud Core
 use DateTime;
 use JsonSerializable;
 use OCP\Files\Folder;
@@ -82,14 +89,20 @@ class UserEntity implements JsonSerializable
 		return $this->id;
 	}
 
-	public function getTimedLocales(\DateTime $date = new DateTime()): string
-	{
+	public function getTimedLocales(
+		\DateTime $date = new DateTime()
+	): string {
 		if (is_null($this->id)) {
-			$timeZone = new \DateTimeZone('UTC');
+			$timeZone = new \DateTimeZone(CstDate::UTC);
 		} else {
 			$defaultTimeZone = date_default_timezone_get();
-			$timeZone = $this->config->getUserValue($this->id, 'core', 'timezone', $defaultTimeZone);
-			$timeZone = isset($timeZone) ? new \DateTimeZone($timeZone) : new \DateTimeZone('UTC');
+			$timeZone = $this->config->getUserValue(
+				$this->id,
+				CstApplication::CORE,
+				CstDate::TIMEZONE,
+				$defaultTimeZone
+			);
+			$timeZone = isset($timeZone) ? new \DateTimeZone($timeZone) : new \DateTimeZone(CstDate::UTC);
 		}
 
 		$date->setTimezone($timeZone);

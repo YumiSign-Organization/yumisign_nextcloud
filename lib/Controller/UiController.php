@@ -21,14 +21,21 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\RCDevs\Controller\UiController as RCDevsUiController;
+use OCA\YumiSignNxtC\RCDevs\Dto\CDEM;
+use OCA\YumiSignNxtC\RCDevs\Controller\UiController as RCDevsUiController;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
-use OCP\IConfig;
+use OCP\IAppConfig;
+use OCP\Config\IUserConfig;
+use OCA\YumiSignNxtC\RCDevs\Service\FilesRefreshService;
 use OCP\IRequest;
+use OCP\IUserSession;
 
 class UiController extends Controller
 {
@@ -38,7 +45,11 @@ class UiController extends Controller
 	public function __construct(
 		$AppName,
 		IRequest $request,
-		private IConfig $config,
+		private IAppConfig $config,
+		private IUserConfig $userConfig,
+		private IUserSession $userSession,
+		private LogRCDevs $logRCDevs,
+		private FilesRefreshService $filesRefresh,
 	) {
 		parent::__construct($AppName, $request);
 
@@ -58,5 +69,54 @@ class UiController extends Controller
 	public function getItemsPerPage(): JSONResponse
 	{
 		return $this->rcdevsUiController->getItemsPerPage();
+	}
+
+	/**
+	 * @NoAdminRequired
+	 */
+	public function pollRefreshSignal(
+		string $lastToken = ''
+	): JSONResponse {
+		$cdem = new CDEM();
+
+		try {
+			$user = $this->userSession->getUser();
+			$userId = is_null($user) ? '' : $user->getUID();
+
+			if ($userId === '') {
+				$cdem->setOk(data: [
+					'token' => '',
+					'filesToken' => '',
+					'scope' => 'all',
+					'shouldRefresh' => false,
+				]);
+				return new JSONResponse($cdem->toArray());
+			}
+
+			$currentToken = $this->userConfig->getValueString(
+				$userId,
+				$this->configurationService->getAppId(),
+				'ui_refresh_token',
+				''
+			);
+			$currentScope = $this->userConfig->getValueString(
+				$userId,
+				$this->configurationService->getAppId(),
+				'ui_refresh_scope',
+				'all'
+			);
+
+			$shouldRefresh = ($lastToken !== '' && $currentToken !== '' && $lastToken !== $currentToken);
+			$cdem->setOk(data: [
+				'token' => $currentToken,
+				'filesToken' => $this->filesRefresh->token($userId),
+				'scope' => $currentScope,
+				'shouldRefresh' => $shouldRefresh,
+			]);
+		} catch (\Throwable $th) {
+			$cdem->setError($th, $this->logRCDevs);
+		}
+
+		return new JSONResponse($cdem->toArray());
 	}
 }

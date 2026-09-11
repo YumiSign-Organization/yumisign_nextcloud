@@ -21,25 +21,36 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use Exception;
-use OCA\RCDevs\Controller\SignController as RCDevsSignController;
-use OCA\RCDevs\Entity\UserEntity;
-use OCA\RCDevs\Entity\UsersListEntity;
-use OCA\RCDevs\Utility\Helpers;
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCA\RCDevs\Utility\SignatureType;
-use OCA\YumiSignNxtC\Db\SignSessionMapper;
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Controller\SignController as RCDevsSignController;
+use OCA\YumiSignNxtC\RCDevs\Entity\UserEntity;
+use OCA\YumiSignNxtC\RCDevs\Entity\UsersListEntity;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\Helpers;
+use OCA\YumiSignNxtC\RCDevs\Utility\RequestResponse;
+use OCA\YumiSignNxtC\RCDevs\Utility\SignatureType;
+use OCA\YumiSignNxtC\Constant\CstException;
+use OCA\YumiSignNxtC\Constant\CstFile;
+use OCA\YumiSignNxtC\Constant\CstLogMessages;
+use OCA\YumiSignNxtC\Constant\CstRequest;
+use OCA\YumiSignNxtC\Constant\CstReturn;
+use OCA\YumiSignNxtC\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\Db\TransactionMapper;
 use OCA\YumiSignNxtC\Service\ConfigurationService;
 use OCA\YumiSignNxtC\Service\SignService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstException;
-use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
+
+// Nextcloud Core
+use Exception;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\Collaboration\Collaborators\ISearch;
 use OCP\Files\IRootFolder;
+use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserManager;
@@ -56,17 +67,18 @@ class SignController extends Controller
 	private UserEntity				$applicant;
 
 	public function __construct(
-		IConfig								$config,
-		IRequest							$request,
-		IUserManager						$userManager,
-		private			IRootFolder			$rootFolder,
-		private			ISearch				$search,
-		private			IUserSession		$userSession,
-		private			LogRCDevs			$logRCDevs,
-		private			SignService			$signService,
-		private			SignSessionMapper	$mapper,
-		string								$AppName,
-		string								$UserId,
+		IAppConfig $appConfig,
+		IConfig $config,
+		IRequest $request,
+		IUserManager $userManager,
+		private IRootFolder $rootFolder,
+		private ISearch $search,
+		private IUserSession $userSession,
+		private LogRCDevs $logRCDevs,
+		private SignService $signService,
+		private TransactionMapper $mapper,
+		string $AppName,
+		string $UserId
 	) {
 		parent::__construct($AppName, $request);
 
@@ -75,7 +87,7 @@ class SignController extends Controller
 		$this->request			= $request;
 		$this->userManager		= $userManager;
 
-		$this->configurationService = new ConfigurationService($config);
+		$this->configurationService = new ConfigurationService($appConfig);
 
 		// Common RCDevs Settings controller
 		$this->rcdevsSignController = new RCDevsSignController(
@@ -103,10 +115,10 @@ class SignController extends Controller
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
 	// private function commonSignLocalAsync(bool $advanced = false, bool $qualified = false, bool $standard = false)
-	private function commonSignLocalAsync(SignatureType $signatureType)
-	{
+	private function commonSignLocalAsync(
+		SignatureType $signatureType
+	) {
 		$returned = [];
 
 		try {
@@ -117,22 +129,27 @@ class SignController extends Controller
 				$this->config,
 				$this->rootFolder,
 				$this->userManager,
-				userIds: $this->request->getParam('recipientId'),
-				emailAddresses: $this->request->getParam('recipientEmail'),
+				userIds: $this->request->getParam(CstRequest::RECIPIENT_ID),
+				emailAddresses: $this->request->getParam(CstRequest::RECIPIENTEMAIL),
 			);
 
 			// Get data from request
 			$resp = $this->signService->signLocalAsyncPrepare(
 				$this->applicant,
 				$recipientsList,
-				$this->request->getParam('path'),
-				$this->request->getParam('fileId'),
+				$this->request->getParam(CstFile::PATH),
+				$this->request->getParam(CstFile::FILE_ID),
 				$signatureType,
 			);
 
 			$this->logRCDevs->debug(json_encode($resp), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
-			if (Helpers::isIssueResponse($resp)) {
-				throw new Exception($resp[CstRequest::MESSAGE], 1);
+			if ($resp->isFailed()) {
+				throw new Exception($resp->message() ?? CstException::SIGN_PROCESS, 1);
+			}
+
+			$respData = $resp->data();
+			if (!is_array($respData)) {
+				throw new Exception(CstException::SIGN_PROCESS, 1);
 			}
 
 			// Squeeze Designer if signature type is QUALIFIED
@@ -141,36 +158,47 @@ class SignController extends Controller
 			) {
 				$resp = $this->signService->signLocalAsyncSubmit(
 					$this->applicant,
-					$resp[CstRequest::WORKSPACEID],
-					$resp[CstRequest::WORKFLOWID],
-					$resp[CstRequest::ENVELOPEID]
+					$respData[CstRequest::WORKSPACEID],
+					$respData[CstRequest::WORKFLOWID],
+					$respData[CstRequest::ENVELOPEID]
 				);
 				if (Helpers::getIfExists(CstRequest::SESSION, $resp) === CstRequest::OK) {
-					$resp[CstRequest::CODE] = 1;
+					$resp[CstReturn::CODE] = 1;
 				} else {
-					$resp[CstRequest::CODE] = 0;
+					$resp[CstReturn::CODE] = 0;
 				}
 			}
 
-			$returned = [
-				CstRequest::CODE	=> $resp[CstRequest::CODE],
-				CstRequest::DATA	=> $resp[CstRequest::DATA],
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> $resp[CstRequest::MESSAGE],
-				// Specific for Designer
-				CstRequest::DESIGNERURL	=> $resp[CstRequest::DESIGNERURL],
-				CstRequest::ENVELOPEID	=> $resp[CstRequest::ENVELOPEID],
-				CstRequest::WORKFLOWID	=> $resp[CstRequest::WORKFLOWID],
-				CstRequest::WORKSPACEID	=> $resp[CstRequest::WORKSPACEID],
-			];
-		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$designerUrl = null;
+			$rawResponse = $respData[CstRequest::RESPONSE] ?? null;
+			if ($rawResponse instanceof RequestResponse) {
+				$designerUrl = Helpers::getIfExists(CstRequest::DESIGNERURL, $rawResponse->getArray());
+			}
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> CstException::SIGN_PROCESS,
+				CstReturn::CODE	=> $resp->code(),
+				CstReturn::DATA => [
+					CstRequest::DESIGNERURL => $designerUrl,
+					CstRequest::ENVELOPEID => $respData[CstRequest::ENVELOPEID],
+					CstRequest::WORKFLOWID => $respData[CstRequest::WORKFLOWID],
+					CstRequest::WORKSPACEID => $respData[CstRequest::WORKSPACEID],
+				],
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> $resp->message(),
+				// Specific for Designer
+				CstRequest::DESIGNERURL	=> $designerUrl,
+				CstRequest::ENVELOPEID	=> $respData[CstRequest::ENVELOPEID],
+				CstRequest::WORKFLOWID	=> $respData[CstRequest::WORKFLOWID],
+				CstRequest::WORKSPACEID	=> $respData[CstRequest::WORKSPACEID],
+			];
+		} catch (\Throwable $th) {
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+
+			$returned = [
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> CstException::SIGN_PROCESS,
 			];
 		}
 
@@ -180,7 +208,6 @@ class SignController extends Controller
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
-
 	/**
 	 * @NoAdminRequired
 	 */
@@ -192,8 +219,8 @@ class SignController extends Controller
 			$signCheck = $this->rcdevsSignController->signLocalAsyncAdvanced();
 			if (Helpers::isIssueResponse($signCheck)) {
 				throw new Exception(
-					$signCheck[CstRequest::MESSAGE],
-					$signCheck[CstRequest::ERROR],
+					$signCheck[CstReturn::MESSAGE],
+					$signCheck[CstReturn::ERROR],
 				);
 			}
 
@@ -201,13 +228,13 @@ class SignController extends Controller
 			// $returned = $this->commonSignLocalAsync(advanced: true);
 			$returned = $this->commonSignLocalAsync(new SignatureType(advanced: true));
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -225,21 +252,21 @@ class SignController extends Controller
 			$signCheck = $this->rcdevsSignController->signLocalAsyncQualified();
 			if (Helpers::isIssueResponse($signCheck)) {
 				throw new Exception(
-					$signCheck[CstRequest::MESSAGE],
-					$signCheck[CstRequest::ERROR],
+					$signCheck[CstReturn::MESSAGE],
+					$signCheck[CstReturn::ERROR],
 				);
 			}
 
 			// Run process
 			$returned = $this->commonSignLocalAsync(new SignatureType(qualified: true));
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -257,21 +284,21 @@ class SignController extends Controller
 			$signCheck = $this->rcdevsSignController->signLocalAsyncStandard();
 			if (Helpers::isIssueResponse($signCheck)) {
 				throw new Exception(
-					$signCheck[CstRequest::MESSAGE],
-					$signCheck[CstRequest::ERROR],
+					$signCheck[CstReturn::MESSAGE],
+					$signCheck[CstReturn::ERROR],
 				);
 			}
 
 			// Run process
 			$returned = $this->commonSignLocalAsync(new SignatureType(standard: true));
 		} catch (\Throwable $th) {
-			$this->logRCDevs->error(sprintf("Critical error during process. Error is \"%s\"", $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -282,22 +309,33 @@ class SignController extends Controller
 	 * @NoAdminRequired
 	 * @NoCSRFRequired
 	 */
-	public function signLocalAsyncSubmit($workspaceId = null, $workflowId = null, $envelopeId = null, $url = null)
-	{
+	public function signLocalAsyncSubmit(
+		$workspaceId = null,
+		$workflowId = null,
+		$envelopeId = null,
+		$url = null
+	) {
 		try {
-			if (!is_null($workspaceId) && !is_null($workflowId) && !is_null($envelopeId) && !is_null($url)) {
-				$resp = $this->signService->signLocalAsyncSubmit(
-					$this->applicant,
-					$workspaceId,
-					$workflowId,
-					$envelopeId
-				);
+			$workspaceId = $workspaceId ?? $this->request->getParam(CstRequest::WORKSPACEID);
+			$workflowId = $workflowId ?? $this->request->getParam(CstRequest::WORKFLOWID);
+			$envelopeId = $envelopeId ?? $this->request->getParam(CstRequest::ENVELOPEID);
+			$url = $url ?? $this->request->getParam('url');
 
-				return new RedirectResponse($url);
+			if (is_null($workspaceId) || is_null($workflowId) || is_null($envelopeId)) {
+				throw new Exception('Missing callback parameters');
 			}
+
+			$this->signService->signLocalAsyncSubmit(
+				$this->applicant,
+				intval($workspaceId),
+				intval($workflowId),
+				strval($envelopeId)
+			);
 		} catch (\Throwable $th) {
-			return $th->getMessage();
+			$this->logRCDevs->error(sprintf(CstLogMessages::CRITICAL_ERROR_PROCESS, $th->getMessage()), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 		}
+
+		return new RedirectResponse(!is_null($url) && $url !== '' ? $url : '/');
 	}
 
 	/**

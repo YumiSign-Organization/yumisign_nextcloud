@@ -21,64 +21,70 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\AppInfo;
 
-use OCA\RCDevs\Utility\Notification;
+// Load Composer autoloader first
+require_once __DIR__ . '/../../vendor/autoload.php';
+
+// RCDevs App
+use OCA\YumiSignNxtC\RCDevs\Utility\Notification;
+use OCA\YumiSignNxtC\Constant\CstApplication;
 use OCA\YumiSignNxtC\FilesLoader;
+use OCA\YumiSignNxtC\Service\ConfigurationService;
+
+// Nextcloud Core
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\EventDispatcher\IEventDispatcher;
-use OCP\IUser;
-
-use OCP\Notification\IManager;
-use OCP\IServerContainer;
+use OCP\IAppConfig;
+use OCP\INavigationManager;
+use OCP\IURLGenerator;
 
 class Application extends App implements IBootstrap
 {
-	// From info.xml
-	protected string $appId;
-	protected string $appNamespace;
+	private string $appId;
+	private string $appName;
+	private string $appNameShort;
+	private string $appNameSigned;
+	private string $appNameSealed;
+	private string $appNamespace;
+	private string $appTableNameSessions;
+	private bool $debugVueJs;
 
 	public function __construct(
 		array $urlParams = [],
 	) {
-		$currentPathFile = pathinfo(__FILE__, PATHINFO_DIRNAME);
+		$this->appId = \basename(\dirname(__DIR__, 2));
 
-		// Integrate RCDevs bundle files
-		$this->require_all_files("{$currentPathFile}/../../rcdevsBundle");
+		/** @var IAppConfig $config */
+		$config = \OC::$server->get(IAppConfig::class);
 
-		/**
-		 * Read info.xml file
-		 */
-		$infoXml = self::readInfo();
+		$configurationService		= new ConfigurationService($config);
+		$this->appName				= $configurationService->getApplicationName();
+		$this->appNameShort			= $configurationService->getApplicationNameShort();
+		$this->debugVueJs			= $configurationService->getDebugVueJs();
+		$this->appNameSigned		= $configurationService->getAppNameSigned();
+		$this->appNameSealed		= $configurationService->getAppNameSealed();
+		$this->appNamespace			= $configurationService->getAppNamespace();
+		$this->appTableNameSessions	= $configurationService->getAppTableNameSessions();
 
-		$this->appId		= $infoXml['id'];
-		$this->appNamespace	= $infoXml['namespace'];
 		parent::__construct($this->appId, $urlParams);
 	}
 
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
-	private static function readInfo(): array
-	{
-		$currentPathFile = pathinfo(__FILE__, PATHINFO_DIRNAME);
-
-		$infoXml = json_decode(json_encode(simplexml_load_string(file_get_contents("{$currentPathFile}/../../appinfo/info.xml"))), true);
-
-		return $infoXml;
-	}
-
 	private function require_all_files($dir)
 	{
 		foreach (glob("$dir/*") as $path) {
 			if (preg_match('/\.php$/', $path)) {
-				require_once $path;	// it's a PHP file so just require it
+				require_once $path;
 			} elseif (is_dir($path)) {
-				$this->require_all_files($path);	// it's a subdir, so call the same function for this subdir
+				$this->require_all_files($path);
 			}
 		}
 	}
@@ -86,48 +92,68 @@ class Application extends App implements IBootstrap
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
-
-	public static function APP_ID()
+	public function getAppId(): string
 	{
-		$infoXml = self::readInfo();
+		return $this->appId;
+	}
 
-		return ($infoXml === false) ? null : (string)$infoXml['id'];
+	public function getAppName(): string
+	{
+		return $this->appName;
+	}
+
+	public function getAppNameSigned(): string
+	{
+		return $this->appNameSigned;
+	}
+
+	public function getAppNameSealed(): string
+	{
+		return $this->appNameSealed;
+	}
+
+	public function getAppNamespace(): string
+	{
+		return $this->appNamespace;
+	}
+
+	public function getAppTableNameSessions(): string
+	{
+		return $this->appTableNameSessions;
+	}
+
+	public function getDebugVueJs(): bool
+	{
+		return $this->debugVueJs;
 	}
 
 	public function register(IRegistrationContext $context): void
 	{
-		// $context->registerCapability(Capabilities::class);
 		$context->registerNotifierService(Notification::class);
 	}
 
 	public function boot(IBootContext $context): void
 	{
-		$server = $context->getServerContainer();
-		$this->registerNotifier($server);
+		/** @var INavigationManager $navManager */
+		$navManager = \OC::$server->get(INavigationManager::class);
 
-		// TODO	deprecatedd fcts: TBR
-		// $server->getNavigationManager()->add(function () use ($server) {
-		// 	// /** @var IUser $user */
-		// 	// $user = $server->getUserSession()->getUser();
-		// 	return [
-		// 		'id' => $this->appId,
-		// 		'name' => $server->getL10N($this->appId)->t($this->appNamespace),
-		// 		'href' => $server->getURLGenerator()->linkToRouteAbsolute($this->appId . '.Page.index'),
-		// 		'icon' => $server->getURLGenerator()->imagePath($this->appId, 'app.svg'),
-		// 		'order' => 3,
-		// 		'type' => 'link',
-		// 	];
-		// });
+		/** @var IURLGenerator $urlGenerator */
+		$urlGenerator = \OC::$server->get(IURLGenerator::class);
+
+		$navManager->add(function () use ($urlGenerator) {
+			return [
+				CstApplication::ID    => $this->appId,
+				CstApplication::NAME  => $this->appNameShort,
+				CstApplication::HREF  => $urlGenerator->linkToRouteAbsolute($this->appId . '.Page.index'),
+				CstApplication::ICON  => $urlGenerator->imagePath($this->appId, 'app.svg'),
+				CstApplication::ORDER => 3,
+				CstApplication::TYPE  => CstApplication::LINK,
+			];
+		});
 
 		/** @var IEventDispatcher $dispatcher */
-		$dispatcher = $server->get(IEventDispatcher::class);
+		$dispatcher = \OC::$server->get(IEventDispatcher::class);
 
 		FilesLoader::register($dispatcher);
-	}
-
-	protected function registerNotifier(IServerContainer $server): void
-	{
-		$manager = $server->get(IManager::class);
-		$manager->registerNotifierService(Notification::class);
 	}
 }

@@ -21,9 +21,14 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC;
 
-use OCA\YumiSignNxtC\AppInfo\Application;
+// RCDevs App
+use OCA\YumiSignNxtC\AppInfo\Application as RCDevsApp;
+
+// Nextcloud Core
 use OCP\App\IAppManager;
 use OCP\AppFramework\Services\IInitialState;
 use OCP\Collaboration\Resources\LoadAdditionalScriptsEvent;
@@ -44,7 +49,8 @@ class FilesLoader implements IEventListener
 	public function __construct(
 		IInitialState $initialState,
 		IAppManager $appManager,
-		Config $config
+		Config $config,
+		private RCDevsApp $application,
 	) {
 		$this->initialState = $initialState;
 		$this->appManager = $appManager;
@@ -65,13 +71,11 @@ class FilesLoader implements IEventListener
 
 	private function handleAdditionalScripts(LoadAdditionalScriptsEvent $event): void
 	{
-		$appId = Application::APP_ID();
-
-		if (!$this->appManager->isEnabledForUser($appId)) {
+		if (!$this->appManager->isEnabledForUser($this->application->getAppId())) {
 			return;
 		}
 
-		Util::addScript($appId, $appId . '-loader');
-		Util::addStyle($appId, 'icons');
+		Util::addScript($this->application->getAppId(), $this->application->getAppId() . '-loader');
+		Util::addStyle($this->application->getAppId(), 'icons');
 	}
 }

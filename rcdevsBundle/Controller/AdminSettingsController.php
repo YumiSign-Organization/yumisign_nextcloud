@@ -21,27 +21,33 @@
  *
  */
 
-namespace OCA\RCDevs\Controller;
+declare(strict_types=1);
 
-use OCA\RCDevs\Service\ConfigurationService;
-use OCA\RCDevs\Service\SettingsService;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
-use OCA\RCDevs\Utility\Constantes\CstEntity;
+namespace OCA\YumiSignNxtC\RCDevs\Controller;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstEntity;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Service\ConfigurationService;
+use OCA\YumiSignNxtC\RCDevs\Service\SettingsService;
+
+// Nextcloud Core
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
-use OCP\IConfig;
+use OCP\IAppConfig;
 use OCP\IRequest;
 
 class AdminSettingsController extends Controller
 {
 	private	ConfigurationService	$configurationService;
-	private IConfig					$config;
+	private IAppConfig				$config;
 
 	public function __construct(
-		string								$AppName,
-		IRequest							$request,
-		IConfig								$config,
-		private		SettingsService			$settingsService,
+		string $AppName,
+		IRequest $request,
+		IAppConfig $config,
+		private SettingsService $settingsService
 	) {
 		parent::__construct($AppName, $request);
 
@@ -55,8 +61,9 @@ class AdminSettingsController extends Controller
 	 * PROTECTED
 	 ****************************************************************************************** */
 
-	public function checkServerUrl(string $serverUrl): array
-	{
+	public function checkServerUrl(
+		string $serverUrl
+	): array {
 		// Get the server url status (OK/KO) for the Settings page
 		return $this->settingsService->checkServerUrl($serverUrl);
 	}
@@ -70,8 +77,8 @@ class AdminSettingsController extends Controller
 		$resp = $this->settingsService->lastJobRun();
 
 		return new JSONResponse([
-			CstRequest::CODE	=> $resp[CstRequest::CODE],
-			CstRequest::MESSAGE	=> $resp[CstRequest::MESSAGE],
+			CstReturn::CODE		=> $resp[CstReturn::CODE],
+			CstReturn::MESSAGE	=> $resp[CstReturn::MESSAGE],
 			CstRequest::STATUS	=> $resp[CstRequest::STATUS],
 		]);
 	}
@@ -99,32 +106,32 @@ class AdminSettingsController extends Controller
 		$resp = $this->settingsService->resetJob();
 
 		return new JSONResponse([
-			CstRequest::CODE	=> $resp[CstRequest::CODE],
+			CstReturn::CODE		=> $resp[CstReturn::CODE],
+			CstReturn::MESSAGE	=> $resp[CstReturn::MESSAGE],
 			CstRequest::STATUS	=> $resp[CstRequest::STATUS],
-			CstRequest::MESSAGE	=> $resp[CstRequest::MESSAGE]
 		]);
 	}
 
 	public function saveSettings()
 	{
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::API_KEY,					$this->request->getParam(CstEntity::API_KEY));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::ASYNC_TIMEOUT,			$this->request->getParam(CstEntity::ASYNC_TIMEOUT));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::CLIENT_ID,				$this->request->getParam(CstEntity::CLIENT_ID));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::CLIENT_SECRET,			$this->request->getParam(CstEntity::CLIENT_SECRET));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::CRON_INTERVAL,			$this->request->getParam(CstEntity::CRON_INTERVAL));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::API_KEY,					$this->request->getParam(CstEntity::API_KEY));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::ASYNC_TIMEOUT,			(int) $this->request->getParam(CstEntity::ASYNC_TIMEOUT));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::CLIENT_ID,				$this->request->getParam(CstEntity::CLIENT_ID));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::CLIENT_SECRET,			$this->request->getParam(CstEntity::CLIENT_SECRET));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::CRON_INTERVAL,			(int) $this->request->getParam(CstEntity::CRON_INTERVAL));
 
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::ENABLE_SIGN,				$this->request->getParam(CstEntity::ENABLE_SIGN));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::OVERWRITE,				$this->request->getParam(CstEntity::OVERWRITE));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::ENABLE_SIGN,				(int) $this->request->getParam(CstEntity::ENABLE_SIGN));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::OVERWRITE,				(int) $this->request->getParam(CstEntity::OVERWRITE));
 
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::PROXY_HOST,				$this->request->getParam(CstEntity::PROXY_HOST));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::PROXY_PASSWORD,			$this->request->getParam(CstEntity::PROXY_PASSWORD));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::PROXY_PORT,				$this->request->getParam(CstEntity::PROXY_PORT));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::PROXY_USERNAME,			$this->request->getParam(CstEntity::PROXY_USERNAME));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::PROXY_HOST,				$this->request->getParam(CstEntity::PROXY_HOST));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::PROXY_PASSWORD,			$this->request->getParam(CstEntity::PROXY_PASSWORD));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::PROXY_PORT,				$this->request->getParam(CstEntity::PROXY_PORT));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::PROXY_USERNAME,			$this->request->getParam(CstEntity::PROXY_USERNAME));
 
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::SIGN_TYPE_ADVANCED,		$this->request->getParam(CstEntity::SIGN_TYPE_ADVANCED));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::SIGN_TYPE_QUALIFIED,		$this->request->getParam(CstEntity::SIGN_TYPE_QUALIFIED));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::SIGN_TYPE_STANDARD,		$this->request->getParam(CstEntity::SIGN_TYPE_STANDARD));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::TEXTUAL_COMPLEMENT_SIGN,	$this->request->getParam(CstEntity::TEXTUAL_COMPLEMENT_SIGN));
-		$this->config->setAppValue($this->configurationService->getAppId(), CstEntity::USE_PROXY,				$this->request->getParam(CstEntity::USE_PROXY));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::SIGN_TYPE_ADVANCED,		(int) $this->request->getParam(CstEntity::SIGN_TYPE_ADVANCED));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::SIGN_TYPE_QUALIFIED,		(int) $this->request->getParam(CstEntity::SIGN_TYPE_QUALIFIED));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::SIGN_TYPE_STANDARD,		(int) $this->request->getParam(CstEntity::SIGN_TYPE_STANDARD));
+		$this->config->setValueString($this->configurationService->getAppId(), CstEntity::TEXTUAL_COMPLEMENT_SIGN,	$this->request->getParam(CstEntity::TEXTUAL_COMPLEMENT_SIGN));
+		$this->config->setValueInt($this->configurationService->getAppId(), CstEntity::USE_PROXY,				(int) $this->request->getParam(CstEntity::USE_PROXY));
 	}
 }

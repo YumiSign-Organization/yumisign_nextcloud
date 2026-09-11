@@ -1,7 +1,7 @@
 {
 	"name": "nextcloud/yumisign_nextcloud",
 	"description": "Sign documents with YumiSign through Nextcloud",
-	"version": "1.32.0",
+	"version": "1.33.0",
 	"license": "AGPL-3.0-only",
 	"authors": [
 		{
@@ -16,7 +16,7 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"OCA\\RCDevs\\": "rcdevsBundle/"
+			"OCA\\YumiSignNxtC\\RCDevs\\": "rcdevsBundle/"
 		}
 	},
 	"config": {
@@ -47,6 +47,7 @@
 		"test": "cd tests/php/ && phpunit -c phpunit.xml"
 	},
 	"require-dev": {
+		"phpunit/phpunit": "^9.6",
 		"roave/security-advisories": "dev-latest"
 	},
 	"require": {

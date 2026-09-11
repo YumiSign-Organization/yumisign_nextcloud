@@ -121,11 +121,14 @@
 	msgid	"Checking Cron"
 	msgstr	"Vérification de la planification"
 
-	msgid	"The cron job is activated"
-	msgstr	"La tâche planifiée est activée"
+msgid	"The cron job is activated"
+msgstr	"La tâche planifiée est activée"
 
-	msgid	"The cron job is activated; the last time the job ran was at %s"
-	msgstr	"La tâche planifiée est activée ; la dernière exécution du processus était à %s"
+msgid	"The cron job is activated; it has never run yet"
+msgstr	"La tâche planifiée est activée ; elle n'a encore jamais été exécutée"
+
+msgid	"The cron job is activated; the last time the job ran was at %s"
+msgstr	"La tâche planifiée est activée ; la dernière exécution du processus était à %s"
 
 	msgid	"The cron job was disabled at %s"
 	msgstr	"La tâche cron a été désactivée à %s"
@@ -541,3 +544,25 @@ msgstr	"débutée"
 
 msgid	"Define the execution periodicity of the background job that checks for completed signature requests."
 msgstr	"Définir la périodicité d'exécution de la tâche d'arrière-plan qui vérifie si les demandes de signature sont terminées."
+
+# Signed document destinations
+msgid "Signed document folders"
+msgstr "Dossiers des documents signés"
+
+msgid "Paths are relative to your Files root. Folders are created only when saving a successfully signed document."
+msgstr "Les chemins sont relatifs à la racine de vos fichiers. Les dossiers sont créés uniquement lors de la sauvegarde après réussite complète de la signature."
+
+msgid "As applicant"
+msgstr "En tant que demandeur"
+
+msgid "As recipient"
+msgstr "En tant que signataire"
+
+msgid "Invalid signed folder settings block signing. Correct the error to continue."
+msgstr "Une erreur dans les dossiers de sauvegarde bloque la signature. Corrigez cette erreur pour continuer."
+
+msgid "Saving…"
+msgstr "Enregistrement…"
+
+msgid "Overwrite existing signed files in the destination folder (disabled: add a numbered suffix)"
+msgstr "Écraser les fichiers signés existants dans le dossier de destination (sinon : ajout d’un suffixe numéroté)"

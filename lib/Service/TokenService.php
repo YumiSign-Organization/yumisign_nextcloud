@@ -21,19 +21,27 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Service;
 
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\RCDevs\Utility\WarningException;
+use OCA\YumiSignNxtC\Constant\CstCommon;
+use OCA\YumiSignNxtC\Constant\CstEntity;
+use OCA\YumiSignNxtC\Constant\CstMessage;
+use OCA\YumiSignNxtC\Constant\CstRequest;
+use OCA\YumiSignNxtC\Constant\CstReturn;
+use OCA\YumiSignNxtC\Constant\CstTransactionType;
+
+// Nextcloud Core
 use Exception;
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCA\RCDevs\Utility\WarningException;
-use OCA\YumiSignNxtC\Utility\Constantes\CstCommon;
-use OCA\YumiSignNxtC\Utility\Constantes\CstEntity;
-use OCA\YumiSignNxtC\Utility\Constantes\CstMessage;
-use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
-use OCP\IConfig;
-use OCP\Security\ICrypto;
 use OCP\Http\Client\IClientService;
+use OCP\IAppConfig;
+use OCP\IConfig;
 use OCP\IURLGenerator;
+use OCP\Security\ICrypto;
 use Throwable;
 
 class TokenService
@@ -42,32 +50,33 @@ class TokenService
 	protected	CurlService			$curlService;
 
 	public function __construct(
-		private		IClientService	$http,
-		private		IConfig			$config,
-		private		ICrypto			$crypto,
-		private		IURLGenerator	$urlGen,
-		private		LogRCDevs		$logRCDevs,
-
+		private IClientService $http,
+		private IConfig $config,
+		private IAppConfig $appConfig,
+		private ICrypto $crypto,
+		private IURLGenerator $urlGen,
+		private LogRCDevs $logRCDevs
 	) {
-		$this->configurationService = new ConfigurationService($config);
+		$this->configurationService = new ConfigurationService($appConfig);
 
 		$_credentialKey = "{$this->configurationService->getApiKeyName()}:{$this->configurationService->getApiKey()}";
-		$this->curlService = new CurlService($config, $this->logRCDevs);
+		$this->curlService = new CurlService($appConfig, $this->logRCDevs);
 		$this->curlService->addCredentialKey($_credentialKey);
 	}
 
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
 	/** 
 	 * Compute and persist absolute access token expiration for the current user.
 	 * 
 	 * @param int $expiresIn Lifetime in seconds as returned by the token endpoint (expires_in).
 	 * @return void
 	 */
-	private function storeAccessExpireAt(int $expiresIn, string $uid): void
-	{
+	private function storeAccessExpireAt(
+		int $expiresIn,
+		string $uid
+	): void {
 		// Defensive: negative or zero -> consider already expired
 		$expiresAt = time() + max(0, (int)$expiresIn);
 		// Persist as unix epoch seconds in user config
@@ -82,11 +91,10 @@ class TokenService
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
-
 	public function retrieveTokens(
 		string $code,
 		string $redirectUri,
-		string $uid,
+		string $uid
 	): array {
 		$returned = [];
 
@@ -102,7 +110,7 @@ class TokenService
 						CstRequest::CLIENT_ID		=> $this->configurationService->getClientId(),
 						CstRequest::CLIENT_SECRET	=> $this->configurationService->getClientSecret(),
 						CstRequest::REDIRECT_URI	=> $redirectUri,
-						CstRequest::CODE			=> $code,
+						CstReturn::CODE			=> $code,
 						CstRequest::GRANT_TYPE		=> CstCommon::CODE,
 					], JSON_UNESCAPED_SLASHES),
 					'timeout' => 15,
@@ -127,18 +135,18 @@ class TokenService
 			}
 
 			$returned = [
-				CstRequest::CODE	=> 1,
-				CstRequest::DATA	=> ['redirect_to' => '?yms_connected=1'],
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> CstMessage::ACCESS_TOKEN_REGISTERED,
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> ['redirect_to' => '?yms_connected=1'],
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> CstMessage::ACCESS_TOKEN_REGISTERED,
 			];
 		} catch (\Throwable $th) {
 			$this->logRCDevs->error($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> ['redirect_to' => '?yms_error=' . rawurlencode('token_exchange_failed')],
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> ['redirect_to' => '?yms_error=' . rawurlencode('token_exchange_failed')],
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -157,7 +165,7 @@ class TokenService
 	 * @throws	Exception 
 	 */
 	public function checkAccessToken(
-		string $uid,
+		string $uid
 	): array {
 		$returned = [];
 
@@ -175,31 +183,31 @@ class TokenService
 			}
 
 			$returned = [
-				CstRequest::CODE	=> 1,
-				CstRequest::DATA	=> [
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> [
 					CstRequest::TOKENREGISTERED => true,
 					'tokenExpired'				=> $tokenExpired,
 					// 'expiresAt'					=> $expiresAt,   // unix epoch seconds
 					// 'secondsLeft'				=> $secondsLeft, // convenience for UI
 				],
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> CstMessage::ACCESS_TOKEN_REGISTERED,
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> CstMessage::ACCESS_TOKEN_REGISTERED,
 			];
 		} catch (WarningException $th) {
 			$this->logRCDevs->warning($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$returned = [
-				CstRequest::CODE	=> 1, // 1 because it is not an exception, just a missing token
-				CstRequest::DATA	=> [CstRequest::TOKENREGISTERED => false,],
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 1, // 1 because it is not an exception, just a missing token
+				CstReturn::DATA	=> [CstRequest::TOKENREGISTERED => false,],
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		} catch (\Throwable $th) {
 			$this->logRCDevs->error($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -217,7 +225,7 @@ class TokenService
 	 * @throws	Exception 
 	 */
 	public function deleteAccessToken(
-		string $uid,
+		string $uid
 	): array {
 		$returned = [];
 
@@ -240,29 +248,29 @@ class TokenService
 			}
 
 			$returned = [
-				CstRequest::CODE	=> 1,
-				CstRequest::DATA	=> [
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> [
 					CstRequest::TOKENREGISTERED => false,
 					'tokenDeleted'				=> true,
 				],
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> CstMessage::TOKEN_DELETED,
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> CstMessage::TOKEN_DELETED,
 			];
 		} catch (WarningException $th) {
 			$this->logRCDevs->warning($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$returned = [
-				CstRequest::CODE	=> 1, // 1 because it is not an exception, just a missing token
-				CstRequest::DATA	=> [CstRequest::TOKENREGISTERED => false,],
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 1, // 1 because it is not an exception, just a missing token
+				CstReturn::DATA	=> [CstRequest::TOKENREGISTERED => false,],
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		} catch (\Throwable $th) {
 			$this->logRCDevs->error($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 
@@ -279,8 +287,9 @@ class TokenService
 	 * @return bool 
 	 * @throws Throwable 
 	 */
-	public function isTokenExpired(string $uid): bool
-	{
+	public function isTokenExpired(
+		string $uid
+	): bool {
 		$expireAtRaw	= $this->config->getUserValue($uid, $this->configurationService->getAppId(), 'access_expire_at', default: null);
 		$expiresAt		= is_null($expireAtRaw) || $expireAtRaw === '' ? 0 : (int)$expireAtRaw;
 		$now			= time();
@@ -337,18 +346,18 @@ class TokenService
 			}
 
 			$returned = [
-				CstRequest::CODE	=> 1,
-				CstRequest::DATA	=> [CstRequest::TOKENREGISTERED => true,],
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> CstMessage::TOKEN_REFRESHED,
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> [CstRequest::TOKENREGISTERED => true,],
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> CstMessage::TOKEN_REFRESHED,
 			];
 		} catch (\Throwable $th) {
 			$this->logRCDevs->error($th->getMessage(), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> null,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> $th->getMessage(),
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> null,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> $th->getMessage(),
 			];
 		}
 

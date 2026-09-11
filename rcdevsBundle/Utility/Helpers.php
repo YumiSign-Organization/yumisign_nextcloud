@@ -21,12 +21,20 @@
  *
  */
 
-namespace OCA\RCDevs\Utility;
+declare(strict_types=1);
 
+namespace OCA\YumiSignNxtC\RCDevs\Utility;
+
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Constant\CstCommon;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstException;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstRequest;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstReturn;
+use OCA\YumiSignNxtC\RCDevs\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+
+// Nextcloud Core
 use Exception;
-use OCA\RCDevs\Utility\Constantes\CstCommon;
-use OCA\RCDevs\Utility\Constantes\CstException;
-use OCA\RCDevs\Utility\Constantes\CstRequest;
 use ReflectionClass;
 use ReflectionObject;
 use ReflectionProperty;
@@ -34,11 +42,14 @@ use ReflectionProperty;
 class Helpers
 {
 	public function __construct(
-		protected	LogRCDevs				$logRCDevs,
-	) {}
+		protected LogRCDevs $logRCDevs
+	) {
+	}
 
-	public static function areDifferent(string $firstString, string $secondString)
-	{
+	public static function areDifferent(
+		string $firstString,
+		string $secondString
+	) {
 		try {
 			return !self::areEqual($firstString, $secondString);
 		} catch (\Throwable $th) {
@@ -46,8 +57,10 @@ class Helpers
 		}
 	}
 
-	public static function areEqual(string $firstString, string $secondString)
-	{
+	public static function areEqual(
+		string $firstString,
+		string $secondString
+	) {
 		try {
 			$returned = strcasecmp($firstString, $secondString) === 0;
 			return $returned;
@@ -56,8 +69,12 @@ class Helpers
 		}
 	}
 
-	public static function getArrayData(array|null $array, string $key, bool $missingForbidden, string $exceptionMessage = null)
-	{
+	public static function getArrayData(
+		array|null $array,
+		string $key,
+		bool $missingForbidden,
+		string|null $exceptionMessage = null
+	) {
 		if (is_null($array) && $missingForbidden) {
 			throw new Exception(CstException::ARRAY_NULL);
 		}
@@ -78,8 +95,11 @@ class Helpers
 		}
 	}
 
-	public static function getIfExists(string $field, array|object $requestIntel, bool $returnNull = true)
-	{
+	public static function getIfExists(
+		string $field,
+		array|object $requestIntel,
+		bool $returnNull = true
+	) {
 		$returnValue = ($returnNull ? null : '');
 
 		try {
@@ -92,17 +112,8 @@ class Helpers
 
 				case is_object($requestIntel):
 					if (property_exists($requestIntel, $field)) {
-						// // if (
-						// // 	count((new ReflectionObject($requestIntel))->getProperties(ReflectionProperty::IS_PUBLIC)) > 0
-						// // ) {
-						// // 	$checkProperty = ((new ReflectionObject($requestIntel))->getProperties(ReflectionProperty::IS_PUBLIC))[0];
-						// // } else {
-						// // 	$checkProperty = null;
-						// // }
-						// $checkProperty = (new ReflectionObject($requestIntel))->getProperties(ReflectionProperty::IS_PUBLIC);
-
 						switch (true) {
-							case (new ReflectionProperty($requestIntel, $field))->isPublic() :
+							case (new ReflectionProperty($requestIntel, $field))->isPublic():
 								$returnValue = $requestIntel->$field;
 								break;
 
@@ -133,8 +144,10 @@ class Helpers
 		return $returnValue;
 	}
 
-	public static function humanFileSize(int $size, string $unit = "")
-	{
+	public static function humanFileSize(
+		int $size,
+		string $unit = ""
+	) {
 		if ((!$unit && $size >= 1 << 30) || $unit == "GB")
 			return number_format($size / (1 << 30), 2) . " GB";
 
@@ -147,10 +160,21 @@ class Helpers
 		return number_format($size) . " bytes";
 	}
 
-	public static function isAdvanced(int $advanced)
-	{
+	public static function isAdvanced(
+		int $advanced
+	) {
 		try {
 			return (intval($advanced) === 1);
+		} catch (\Throwable $th) {
+			throw $th;
+		}
+	}
+
+	public static function isQualified(
+		int $qualified
+	) {
+		try {
+			return (intval($qualified) === 1);
 		} catch (\Throwable $th) {
 			throw $th;
 		}
@@ -161,9 +185,10 @@ class Helpers
 	 * @param array|object $response Paramter to check invalidity
 	 * @return bool Returns true or false according if given $response is invalid or not
 	 */
-	public static function isIssueResponse(array|object $response): bool
-	{
-		return !self::isValidResponse($response);
+	public static function isIssueResponse(
+		array|object $response
+	): bool {
+		return !self::isValidHttpResponse($response);
 	}
 
 	/**
@@ -171,16 +196,18 @@ class Helpers
 	 * @param array|object $response Paramter to check validity
 	 * @return bool Returns true or false according if given $response is valid or not
 	 */
-	public static function isValidResponse(array|object $response): bool
-	{
+	public static function isValidHttpResponse(
+		array|object $response
+	): bool {
 		try {
-			$codeIfExists = self::getIfExists(CstRequest::CODE, $response);
+			$codeIfExists = self::getIfExists(CstReturn::CODE, $response);
 			$code = is_null($codeIfExists)
 				? 0
 				: $codeIfExists;
 
 			return (
-				$code === 1 ||		// standard OK code
+				$code === 0 ||		// CDEM standard OK code
+				$code === 1 ||		// legacy OK code
 				$code === 2 ||		// code for pending operations but current status is OK
 				$code === 200 ||	// https returned OK code
 				$code === true		// true is... true so OK...
@@ -190,8 +217,9 @@ class Helpers
 		}
 	}
 
-	public static function isPdf(string $path)
-	{
+	public static function isPdf(
+		string $path
+	) {
 		try {
 			return
 				strcasecmp(
@@ -203,11 +231,12 @@ class Helpers
 		}
 	}
 
-	public static function warning(string $warningMsg)
-	{
+	public static function warning(
+		string $warningMsg
+	) {
 		return [
-			CstRequest::CODE	=> false,
-			CstRequest::MESSAGE	=> $warningMsg,
+			CstReturn::CODE	=> false,
+			CstReturn::MESSAGE	=> $warningMsg,
 		];
 	}
 }

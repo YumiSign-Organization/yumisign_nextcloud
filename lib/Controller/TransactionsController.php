@@ -21,15 +21,22 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\RCDevs\Utility\LogRCDevs;
-use OCA\YumiSignNxtC\Db\SignSessionMapper;
+// RCDevs Bundle
+use OCA\YumiSignNxtC\RCDevs\Service\LogRCDevs;
+use OCA\YumiSignNxtC\Constant\CstDatabase;
+use OCA\YumiSignNxtC\Constant\CstException;
+use OCA\YumiSignNxtC\Constant\CstRequest;
+use OCA\YumiSignNxtC\Constant\CstReturn;
+use OCA\YumiSignNxtC\Constant\CstStatus;
+use OCA\YumiSignNxtC\Constant\CstTransactionType;
+use OCA\YumiSignNxtC\Db\TransactionMapper;
 use OCA\YumiSignNxtC\Service\TransactionsService;
-use OCA\YumiSignNxtC\Utility\Constantes\CstDatabase;
-use OCA\YumiSignNxtC\Utility\Constantes\CstException;
-use OCA\YumiSignNxtC\Utility\Constantes\CstRequest;
-use OCA\YumiSignNxtC\Utility\Constantes\CstStatus;
+
+// Nextcloud Core
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -45,14 +52,14 @@ class TransactionsController extends Controller
 
 	public function __construct(
 		$AppName,
-		IManager						$notificationManager,
-		IRequest						$request,
-		ITimeFactory					$timeFactory,
-		IUserManager					$userManager,
-		private		SignSessionMapper	$mapper,
-		private		string				$userId,
-		private		TransactionsService	$transactionsService,
-		protected	LogRCDevs			$logRCDevs,
+		IManager $notificationManager,
+		IRequest $request,
+		ITimeFactory $timeFactory,
+		IUserManager $userManager,
+		private TransactionMapper $mapper,
+		private string $userId,
+		private TransactionsService $transactionsService,
+		protected LogRCDevs $logRCDevs
 	) {
 		parent::__construct($AppName, $request);
 
@@ -64,9 +71,11 @@ class TransactionsController extends Controller
 	/** ******************************************************************************************
 	 * PRIVATE
 	 ****************************************************************************************** */
-
-	private function commonGetTransactions(int $page, int $nbItems, string $status): JSONResponse
-	{
+	private function commonGetTransactions(
+		int $page,
+		int $nbItems,
+		string $status
+	): JSONResponse {
 		$data = [
 			CstDatabase::COUNT => 0,
 			'transactions' => [],
@@ -83,10 +92,10 @@ class TransactionsController extends Controller
 			$data = $this->transactionsService->$functionToRun($this->userId, $page, $nbItems);
 
 			$returned = [
-				CstRequest::CODE	=> 1,
-				CstRequest::DATA	=> $data,
-				CstRequest::ERROR	=> null,
-				CstRequest::MESSAGE	=> null,
+				CstReturn::CODE	=> 0,
+				CstReturn::DATA	=> $data,
+				CstReturn::ERROR	=> null,
+				CstReturn::MESSAGE	=> null,
 			];
 
 			$this->logRCDevs->debug(json_encode($data), __FUNCTION__ . DIRECTORY_SEPARATOR . __CLASS__ . DIRECTORY_SEPARATOR . (isset($th) ? $th->getFile() . ':' . $th->getLine() : __FILE__ . ':' . __LINE__));
@@ -96,10 +105,10 @@ class TransactionsController extends Controller
 				'transactions' => null,
 			];
 			$returned = [
-				CstRequest::CODE	=> 0,
-				CstRequest::DATA	=> $data,
-				CstRequest::ERROR	=> $th->getCode(),
-				CstRequest::MESSAGE	=> CstException::QUERY_TRANSACTION,
+				CstReturn::CODE	=> 1,
+				CstReturn::DATA	=> $data,
+				CstReturn::ERROR	=> $th->getCode(),
+				CstReturn::MESSAGE	=> CstException::QUERY_TRANSACTION,
 			];
 		}
 		return new JSONResponse($returned);
@@ -108,7 +117,6 @@ class TransactionsController extends Controller
 	/** ******************************************************************************************
 	 * PUBLIC
 	 ****************************************************************************************** */
-
 	/**
 	 * @NoAdminRequired
 	 */
@@ -148,40 +156,50 @@ class TransactionsController extends Controller
 	/**
 	 * @NoAdminRequired
 	 */
-	public function getTransactionsCompleted(int $page = 0, int $nbItems = 20)
-	{
+	public function getTransactionsCompleted(
+		int $page = 0,
+		int $nbItems = 20
+	) {
 		return $this->commonGetTransactions($page, $nbItems, CstStatus::COMPLETED);
 	}
 
 	/**
 	 * @NoAdminRequired
 	 */
-	public function getTransactionsDeclined(int $page = 0, int $nbItems = 20)
-	{
+	public function getTransactionsDeclined(
+		int $page = 0,
+		int $nbItems = 20
+	) {
 		return $this->commonGetTransactions($page, $nbItems, CstStatus::DECLINED);
 	}
 
 	/**
 	 * @NoAdminRequired
 	 */
-	public function getTransactionsExpired(int $page = 0, int $nbItems = 20)
-	{
+	public function getTransactionsExpired(
+		int $page = 0,
+		int $nbItems = 20
+	) {
 		return $this->commonGetTransactions($page, $nbItems, CstStatus::EXPIRED);
 	}
 
 	/**
 	 * @NoAdminRequired
 	 */
-	public function getTransactionsFailed(int $page = 0, int $nbItems = 20)
-	{
+	public function getTransactionsFailed(
+		int $page = 0,
+		int $nbItems = 20
+	) {
 		return $this->commonGetTransactions($page, $nbItems, CstStatus::FAILED);
 	}
 
 	/**
 	 * @NoAdminRequired
 	 */
-	public function getTransactionsPending(int $page = 0, int $nbItems = 20)
-	{
+	public function getTransactionsPending(
+		int $page = 0,
+		int $nbItems = 20
+	) {
 		return $this->commonGetTransactions($page, $nbItems, CstStatus::PENDING);
 	}
 }

@@ -21,26 +21,29 @@
  *
  */
 
+declare(strict_types=1);
+
 namespace OCA\YumiSignNxtC\Controller;
 
-use OCA\YumiSignNxtC\AppInfo\Application;
+// RCDevs App
+use OCA\YumiSignNxtC\AppInfo\Application as RCDevsApp;
+use OCA\YumiSignNxtC\Constant\CstApplication;
+
+// Nextcloud Core
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http\TemplateResponse;
-use OCP\AppFramework\Services\IInitialState;
 use OCP\HintException;
-use OCP\IConfig;
+use OCP\AppFramework\Services\IInitialState;
 use OCP\IRequest;
-use OCP\IUserSession;
 
 class PageController extends Controller
 {
 	public function __construct(
-		string								$appName,
-		IRequest							$request,
-		private		IConfig					$config,
-		private		IInitialState			$initialState,
-		private		IUserSession			$userSession,
+		IRequest	$request,
+		private		IInitialState	$initialState,
+		private		RCDevsApp	$application,
+		string		$appName,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -52,14 +55,19 @@ class PageController extends Controller
 	 * @return TemplateResponse
 	 * @throws HintException
 	 */
-	public function index(): TemplateResponse
+	public function index(): Response
 	{
-		$appId = Application::APP_ID();
-		$response = new TemplateResponse($appId, 'index', [
-			'app' => $appId,
-			'id-app-content' => '#app-content-vue',
-			'id-app-navigation' => '#app-navigation-vue',
-		]);
+		$this->initialState->provideInitialState('debugVueJs', $this->application->getDebugVueJs());
+
+		$response = new TemplateResponse(
+			$this->application->getAppId(),
+			CstApplication::INDEX,
+			[
+				CstApplication::APP					=> $this->application->getAppId(),
+				CstApplication::ID_APP_CONTENT		=> '#app-content-vue',
+				CstApplication::ID_APP_NAVIGATION	=> '#app-navigation-vue',
+			]
+		);
 		return $response;
 	}
 }
