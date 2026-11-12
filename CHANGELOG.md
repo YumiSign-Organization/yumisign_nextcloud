@@ -6,6 +6,9 @@ Y: Nextcloud version
 Z: minor or patch
 
 -----------------------------------------
+1.35.0
+- Nextcloud 35 version
+
 1.34.0
 - Nextcloud 34 version
 - Configurable personal folders for signed documents, separately for applicants and recipients.
